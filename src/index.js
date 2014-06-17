@@ -34,7 +34,7 @@ module.exports = function(options) {
                     return callback(makeError(500, 'Could not register user'));
                 }
 
-                delete userDetails.password;
+                delete userDetails.password; // Make sure no possibility of storing unhashed password
                 userDetails.hashedPassword = hashedPassword;
 
                 userStore.add(userDetails, function (err, userId) {
@@ -42,13 +42,10 @@ module.exports = function(options) {
                         return callback(makeError(err));
                     }
 
-                    // userDetails without password details
-                    var safeUserDetails = {
-                        userId: userId,
-                        username: userDetails.username
-                    };
+                    delete userDetails.hashedPassword;
+                    userDetails.userId = userId;
 
-                    emailService.sendRegistrationEmail(safeUserDetails, function(err) {
+                    emailService.sendRegistrationEmail(userDetails, function(err) {
                         if (err) {
                             // log error but don't return error
                             logger.error('Error sending registration email for user ' + userId, err);

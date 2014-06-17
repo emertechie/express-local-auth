@@ -8,13 +8,16 @@ var assert = require('chai').assert,
 function FakeUserStore() {
 }
 FakeUserStore.prototype.add = function(userDetails, callback) {
-    this.userDetailsSeen = userDetails;
+    this.userDetailsSeen = clone(userDetails);
     if (this.simulatedError) {
         callback(simulatedError, null);
     } else {
         callback(null, this.fakeUserId);
     }
 };
+function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
 
 describe('Registration', function() {
 
@@ -64,6 +67,21 @@ describe('Registration', function() {
             .expect(function() {
                 assert.equal(fakeUserStore.userDetailsSeen.username, 'foo');
                 assert.isTrue(bcrypt.compareSync('bar', fakeUserStore.userDetailsSeen.hashedPassword));
+
+                // Make sure raw password is never available to store:
+                assert.isUndefined(fakeUserStore.password);
+            })
+            .end(done);
+    });
+
+    it('should NOT make unhashed password available for storage', function(done) {
+        configure();
+
+        request(app)
+            .post('/register')
+            .send({ username: 'foo', password: 'bar'})
+            .expect(function() {
+                assert.isUndefined(fakeUserStore.userDetailsSeen.password);
             })
             .end(done);
     });

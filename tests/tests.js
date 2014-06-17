@@ -18,7 +18,7 @@ FakeUserStore.prototype.add = function(userDetails, callback) {
 
 describe('Registration', function() {
 
-    var app, fakeUserStore, fakeServices, configure, loggedInUserId, simlulatedLogInErr, userDetailsSeenForRegEmail;
+    var app, fakeUserStore, configure, loggedInUserId, simlulatedLogInErr, userDetailsSeenForRegEmail;
 
     beforeEach(function() {
         loggedInUserId = null;
@@ -27,33 +27,30 @@ describe('Registration', function() {
 
         fakeUserStore = new FakeUserStore();
 
-        fakeServices = {
-            auth: {
-                logIn: function(userId, callback) {
-                    loggedInUserId = userId;
-                    callback(simlulatedLogInErr || null);
-                }
-            },
-            email: {
-                sendRegistrationEmail: function(userDetails, callback) {
-                    userDetailsSeenForRegEmail = userDetails;
-                    callback(null);
-                }
-            },
-            logger: {
-                error: function() {}
+        var fakeAuthService = {
+            logIn: function(userId, callback) {
+                loggedInUserId = userId;
+                callback(simlulatedLogInErr || null);
+            }
+        };
+
+        var fakeEmailService = {
+            sendRegistrationEmail: function(userDetails, callback) {
+                userDetailsSeenForRegEmail = userDetails;
+                callback(null);
             }
         };
 
         app = express();
         app.use(bodyParser());
 
-        configure = function(options, configureServices) {
-            if (configureServices) {
-                configureServices(fakeServices);
-            }
-            var registrationFactory = registration(fakeServices, options);
-            app.use(registrationFactory(fakeUserStore));
+        configure = function(options) {
+            options = options || {};
+            options.logger = { error: function(){} };
+
+            var componentFactory = registration(options);
+            var component = componentFactory(fakeUserStore, fakeAuthService, fakeEmailService);
+            app.use(component.router);
         };
     });
 

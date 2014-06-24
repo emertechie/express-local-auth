@@ -3,9 +3,10 @@ var assert = require('chai').assert,
     bodyParser = require('body-parser'),
     request = require('supertest'),
     FakeUserStore = require('./fakes/userStore'),
+    _ = require('lodash'),
     registration = require('../src/index');
 
-describe('Sentry Registration', function() {
+describe('Registration', function() {
 
     var app, userStore, authService, emailService, config, configure;
 
@@ -74,7 +75,7 @@ describe('Sentry Registration', function() {
 
             emailService = {
                 sendRegistrationEmail: function(userDetails, callback) {
-                    userDetailsSeenForRegEmail = userDetails;
+                    userDetailsSeenForRegEmail = _.clone(userDetails);
                     callback(null);
                 }
             };
@@ -169,29 +170,9 @@ describe('Sentry Registration', function() {
                 .expect(201, userId.toString())
                 .end(done);
         });
+    });
 
-        it('can return custom successful registration response', function(done) {
-            var userId = 99;
-            userStore.fakeUserId = userId;
-
-            configure({
-                registrationOkResponse: function(user, res) {
-                    res.send(201, JSON.stringify({
-                        transformed: config.userIdGetter(user)
-                    }));
-                }
-            });
-
-            var expectedResponseBody = JSON.stringify({
-                transformed: userId
-            });
-
-            request(app)
-                .post('/register')
-                .send({ username: 'foo', password: 'bar'})
-                .expect(201, expectedResponseBody)
-                .end(done);
-        });
+    describe('User Unregistration', function() {
 
         it('should allow authenticated user to unregister', function(done) {
             var username = 'foo';
@@ -241,18 +222,82 @@ describe('Sentry Registration', function() {
                     .end(done);
             });
         });
+    });
 
-        function registerUser(username, password, cb) {
+    describe('Custom Responses', function() {
+
+        it('can return custom successful registration response', function(done) {
+            var userId = 99;
+            userStore.fakeUserId = userId;
+
+            configure({
+                responses: {
+                    registered: function(user, res) {
+                        res.send(201, JSON.stringify({
+                            transformed: config.userIdGetter(user)
+                        }));
+                    }
+                }
+            });
+
+            var expectedResponseBody = JSON.stringify({
+                transformed: userId
+            });
+
             request(app)
                 .post('/register')
-                .send({ username: username, password: password})
-                .expect(201)
-                .end(function(err, res) {
-                    if (err) {
-                        return done(err);
+                .send({ username: 'foo', password: 'bar'})
+                .expect(201, expectedResponseBody)
+                .end(done);
+        });
+
+        it('can return custom unregistered response', function(done) {
+            var username = 'foo';
+            var password = 'bar';
+            setupAuthServiceToAuthenticateUser(username, password);
+
+            configure({
+                responses: {
+                    unregistered: function(res) {
+                        return res.redirect('/home');
                     }
-                    cb(null, res);
-                });
-        }
+                }
+            });
+
+            registerUser(username, password, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                request(app)
+                    .post('/unregister')
+                    .expect(302)
+                    .expect('location', '/home')
+                    .end(done);
+            });
+        });
     });
+
+    function setupAuthServiceToAuthenticateUser(username, password) {
+        authService.isAuthenticated = function(req, cb) {
+            var authenticatedUser = {
+                username: username,
+                password: password
+            };
+            cb(null, authenticatedUser);
+        };
+    }
+
+    function registerUser(username, password, cb) {
+        request(app)
+            .post('/register')
+            .send({ username: username, password: password})
+            .expect(201)
+            .end(function(err, res) {
+                if (err) {
+                    return done(err);
+                }
+                cb(null, res);
+            });
+    }
 });

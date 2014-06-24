@@ -1,4 +1,5 @@
-var express = require('express');
+var express = require('express'),
+    _ = require('lodash');
 
 module.exports = function(options) {
 
@@ -13,14 +14,76 @@ module.exports = function(options) {
 
         var userIdGetter = config.userIdGetter;
 
-        var registrationOkResponse = options.registrationOkResponse || function(user, res) {
-            var userId = userIdGetter(user);
-            res.send(201, JSON.stringify(userId));
+        var responses = _.defaults(options.responses || {}, {
+            registered: function(user, res) {
+                var userId = userIdGetter(user);
+                res.send(201, JSON.stringify(userId));
+            },
+            unregistered: function(res) {
+                res.send(200);
+            }
+        });
+
+        return {
+            router: buildRouter()
         };
 
-        var unregisteredOkResponse = options.unregisteredOkResponse || function(res) {
-            res.send(200);
-        };
+        function buildRouter() {
+
+            var router = express.Router();
+
+            router.post('/register', function (req, res) {
+
+                var userDetails = {
+                    username: req.param("username"),
+                    password: req.param("password")
+                };
+
+                register(req, userDetails, function (err, user) {
+                    if (err) {
+                        return res.send(err.statusCode || 500, err.message ? err.message : err);
+                    }
+
+                    responses.registered(user, res);
+                });
+            });
+
+            router.post('/unregister', function (req, res, next) {
+                authService.isAuthenticated(req, function (err, authenticatedUser) {
+                    if (err) {
+                        return next(err);
+                    }
+
+                    if (authenticatedUser) {
+                        authService.logOut(req, authenticatedUser, function (err) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            var userId = config.userIdGetter(authenticatedUser);
+                            userStore.remove(userId, function (err) {
+                                if (err) {
+                                    return next(err);
+                                }
+
+                                responses.unregistered(res);
+                            });
+                        });
+                    } else {
+                        authService.responses.unauthenticated(res);
+                    }
+                });
+            });
+
+            // TODO: Forgot password. * Rendering email *
+            // app.post('/forgotPassword', ... send email);
+            // app.post('/forgotPassword/callback', ... send email);
+
+            // TODO: Callback to verify email
+            // app.get('/verifyemail', ... userStore.emailVerified(userId));
+
+            return router;
+        }
 
         function makeError(statusCodeOrError, message) {
             if (arguments.length === 1) {
@@ -71,61 +134,5 @@ module.exports = function(options) {
                 });
             });
         }
-
-        var router = express.Router();
-
-        router.post('/register', function (req, res) {
-
-            var userDetails = {
-                username: req.param("username"),
-                password: req.param("password")
-            };
-
-            register(req, userDetails, function (err, user) {
-                if (err) {
-                    return res.send(err.statusCode || 500, err.message ? err.message : err);
-                }
-
-                registrationOkResponse(user, res);
-            });
-        });
-
-        router.post('/unregister', function(req, res, next) {
-            authService.isAuthenticated(req, function(err, authenticatedUser) {
-                if (err) {
-                    return next(err);
-                }
-
-                if (authenticatedUser) {
-                    authService.logOut(req, authenticatedUser, function(err) {
-                        if (err) {
-                            return next(err);
-                        }
-
-                        var userId = config.userIdGetter(authenticatedUser);
-                        userStore.remove(userId, function(err) {
-                            if (err) {
-                                return next(err);
-                            }
-
-                            unregisteredOkResponse(res);
-                        });
-                    });
-                } else {
-                    authService.responses.unauthenticated(res);
-                }
-            });
-        });
-
-        // TODO: Forgot password. * Rendering email *
-        // app.post('/forgotPassword', ... send email);
-        // app.post('/forgotPassword/callback', ... send email);
-
-        // TODO: Callback to verify email
-        // app.get('/verifyemail', ... userStore.emailVerified(userId));
-
-        return {
-            router: router
-        };
-    }
+    };
 };

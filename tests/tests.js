@@ -74,7 +74,7 @@ describe('Registration', function() {
             .end(done);
     });
 
-    it('should NOT make unhashed password available for storage', function(done) {
+    it('should not make unhashed password available for storage', function(done) {
         configure();
 
         request(app)

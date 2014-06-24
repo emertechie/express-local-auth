@@ -1,16 +1,22 @@
-var express = require('express'),
-    bcrypt = require('bcrypt');
+var express = require('express');
 
 module.exports = function(options) {
 
     options = options || {};
     var logger = options.logger || console;
 
-    return function RegistrationComponentFactory(userStore, authService, emailService) {
+    return function RegistrationComponentFactory(userStore, authService, emailService, config) {
 
-        if (!userStore || !authService || !emailService) {
-            throw new Error('Required services missing');
+        if (!userStore || !authService || !emailService || !config) {
+            throw new Error('Required parameters missing');
         }
+
+        var userIdGetter = config.userIdGetter;
+
+        var registrationOkResponse = options.registrationOkResponse || function(user, res) {
+            var userId = userIdGetter(user);
+            res.send(201, JSON.stringify(userId));
+        };
 
         function makeError(statusCodeOrError, message) {
             if (arguments.length === 1) {
@@ -23,45 +29,39 @@ module.exports = function(options) {
             };
         }
 
-        function register(userDetails, callback) {
+        function register(req, userDetails, callback) {
             if (!userDetails.username || !userDetails.password) {
                 return callback(makeError(400, 'Must provide username & password'));
             }
 
-            bcrypt.hash(userDetails.password, 10, function (hashingErr, hashedPassword) {
-                if (hashingErr) {
-                    errorHandler('Error hashing password', hashingErr);
+            authService.hashPassword(userDetails.password, function(err, hashedPassword) {
+                if (err) {
+                    errorHandler('Error hashing password', err);
                     return callback(makeError(500, 'Could not register user'));
                 }
 
                 delete userDetails.password; // Make sure no possibility of storing unhashed password
                 userDetails.hashedPassword = hashedPassword;
 
-                userStore.add(userDetails, function (err, userId) {
+                userStore.add(userDetails, function (err, user) {
                     if (err) {
                         return callback(makeError(err));
                     }
 
-                    delete userDetails.hashedPassword;
-                    userDetails.userId = userId;
+                    var userId = userIdGetter(user);
 
-                    emailService.sendRegistrationEmail(userDetails, function(err) {
+                    emailService.sendRegistrationEmail(user, function(err) {
                         if (err) {
-                            // log error but don't return error
+                            // log error but don't return it
                             logger.error('Error sending registration email for user ' + userId, err);
                         }
 
-                        authService.logIn(userId, function(err) {
+                        authService.logIn(req, user, function(err) {
                             if (err) {
                                 logger.error('Could not log in user ' + userId + ' after registration', err);
                                 return callback(makeError(500, err));
                             }
-
-                            var successResponse = options.resultTransformer
-                                ? options.resultTransformer(userId)
-                                : userId;
-
-                            callback(null, successResponse);
+                            callback(null, user);
                         });
                     });
                 });
@@ -77,12 +77,12 @@ module.exports = function(options) {
                 password: req.param("password")
             };
 
-            register(userDetails, function (err, response) {
+            register(req, userDetails, function (err, user) {
                 if (err) {
                     return res.send(err.statusCode || 500, err.message ? err.message : err);
                 }
 
-                res.send(201, JSON.stringify(response));
+                registrationOkResponse(user, res);
             });
         });
 

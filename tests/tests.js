@@ -2,7 +2,6 @@ var assert = require('chai').assert,
     express = require('express'),
     bodyParser = require('body-parser'),
     request = require('supertest'),
-    bcrypt = require('bcrypt'),
     registration = require('../src/index');
 
 function FakeUserStore() {
@@ -12,7 +11,9 @@ FakeUserStore.prototype.add = function(userDetails, callback) {
     if (this.simulatedError) {
         callback(simulatedError, null);
     } else {
-        callback(null, this.fakeUserId);
+        var user = clone(userDetails);
+        user.userId = this.fakeUserId;
+        callback(null, user);
     }
 };
 function clone(obj) {
@@ -21,18 +22,31 @@ function clone(obj) {
 
 describe('Registration', function() {
 
-    var app, fakeUserStore, configure, loggedInUserId, simlulatedLogInErr, userDetailsSeenForRegEmail;
+    var app, userStore, configure, loggedInUserId, simlulatedLogInErr, userDetailsSeenForRegEmail, config;
 
     beforeEach(function() {
         loggedInUserId = null;
         simlulatedLogInErr = null;
         userDetailsSeenForRegEmail = null;
 
-        fakeUserStore = new FakeUserStore();
+        // todo: this is horrible. do something better
+        config = {
+            userIdGetter: function(user) {
+                return user.userId
+            },
+            hashedPasswordGetter: function(user) {
+                return user.hashedPassword
+            }
+        };
+
+        userStore = new FakeUserStore();
 
         var fakeAuthService = {
-            logIn: function(userId, callback) {
-                loggedInUserId = userId;
+            hashPassword: function(password, cb) {
+                cb(null, 'HASHED-' + password);
+            },
+            markLoggedInAfterAuthentication: function(req, user, callback) {
+                loggedInUserId = config.userIdGetter(user);
                 callback(simlulatedLogInErr || null);
             }
         };
@@ -52,7 +66,7 @@ describe('Registration', function() {
             options.logger = { error: function(){} };
 
             var componentFactory = registration(options);
-            var component = componentFactory(fakeUserStore, fakeAuthService, fakeEmailService);
+            var component = componentFactory(userStore, fakeAuthService, fakeEmailService, config);
             app.use(component.router);
         };
     });
@@ -65,15 +79,15 @@ describe('Registration', function() {
             .send({ username: 'foo', password: 'bar'})
             .expect(201)
             .expect(function() {
-                assert.equal(fakeUserStore.userDetailsSeen.username, 'foo');
-                assert.isTrue(bcrypt.compareSync('bar', fakeUserStore.userDetailsSeen.hashedPassword));
-
-                // Make sure raw password is never available to store:
-                assert.isUndefined(fakeUserStore.password);
+                assert.deepEqual(userStore.userDetailsSeen, {
+                    username: 'foo',
+                    hashedPassword: 'HASHED-bar'
+                });
             })
             .end(done);
     });
 
+    // tested indirectly above, but want to make it more explicit
     it('should not make unhashed password available for storage', function(done) {
         configure();
 
@@ -81,7 +95,7 @@ describe('Registration', function() {
             .post('/register')
             .send({ username: 'foo', password: 'bar'})
             .expect(function() {
-                assert.isUndefined(fakeUserStore.userDetailsSeen.password);
+                assert.isUndefined(userStore.userDetailsSeen.password);
             })
             .end(done);
     });
@@ -89,14 +103,14 @@ describe('Registration', function() {
     it('should use auth service to log user in after registration', function(done) {
         configure();
 
-        var USER_ID = 99;
-        fakeUserStore.fakeUserId = USER_ID;
+        var userId = 99;
+        userStore.fakeUserId = userId;
 
         request(app)
             .post('/register')
             .send({ username: 'foo', password: 'bar'})
             .expect(function() {
-                assert.equal(USER_ID, loggedInUserId);
+                assert.equal(loggedInUserId, userId);
             })
             .end(done);
     });
@@ -104,7 +118,7 @@ describe('Registration', function() {
     it('should return error if user cannot be logged in', function(done) {
         configure();
 
-        fakeUserStore.fakeUserId = 99;
+        userStore.fakeUserId = 99;
         simlulatedLogInErr = 'it blows up';
 
         request(app)
@@ -117,16 +131,14 @@ describe('Registration', function() {
     it('should use email service to send registration email', function(done) {
         configure();
 
-        fakeUserStore.fakeUserId = 99;
+        userStore.fakeUserId = 99;
 
         request(app)
             .post('/register')
             .send({ username: 'foo', password: 'bar'})
             .expect(function() {
-                assert.deepEqual(userDetailsSeenForRegEmail, {
-                    userId: 99,
-                    username: 'foo'
-                });
+                assert.equal(userDetailsSeenForRegEmail.userId, 99);
+                assert.equal(userDetailsSeenForRegEmail.username, 'foo');
             })
             .end(done);
     });
@@ -134,30 +146,30 @@ describe('Registration', function() {
     it('should return new user ID after registration', function(done) {
         configure();
 
-        var USER_ID = 99;
-        fakeUserStore.fakeUserId = USER_ID;
+        var userId = 99;
+        userStore.fakeUserId = userId;
 
         request(app)
             .post('/register')
             .send({ username: 'foo', password: 'bar'})
-            .expect(201, USER_ID.toString())
+            .expect(201, userId.toString())
             .end(done);
     });
 
     it('should return transformed user ID after registration if transformer provided', function(done) {
-        var USER_ID = 99;
-        fakeUserStore.fakeUserId = USER_ID;
+        var userId = 99;
+        userStore.fakeUserId = userId;
 
         configure({
-            resultTransformer: function(userId) {
-                return {
-                    transformed: userId
-                };
+            registrationOkResponse: function(user, res) {
+                res.send(201, JSON.stringify({
+                    transformed: config.userIdGetter(user)
+                }));
             }
         });
 
         var expectedResponseBody = JSON.stringify({
-            transformed: USER_ID
+            transformed: userId
         });
 
         request(app)

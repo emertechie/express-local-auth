@@ -56,7 +56,7 @@ module.exports = function(options) {
                             logger.error('Error sending registration email for user ' + userId, err);
                         }
 
-                        authService.logIn(req, user, function(err) {
+                        authService.markLoggedInAfterAuthentication(req, user, function(err) {
                             if (err) {
                                 logger.error('Could not log in user ' + userId + ' after registration', err);
                                 return callback(makeError(500, err));

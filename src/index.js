@@ -18,6 +18,10 @@ module.exports = function(options) {
             res.send(201, JSON.stringify(userId));
         };
 
+        var unregisteredOkResponse = options.unregisteredOkResponse || function(res) {
+            res.send(200);
+        };
+
         function makeError(statusCodeOrError, message) {
             if (arguments.length === 1) {
                 message = arguments[0];
@@ -86,8 +90,32 @@ module.exports = function(options) {
             });
         });
 
-        // TODO: Authenticated /unregister endpoint to delete account
-        // app.post('/unregister', ... userStore.remove(userId));
+        router.post('/unregister', function(req, res, next) {
+            authService.isAuthenticated(req, function(err, authenticatedUser) {
+                if (err) {
+                    return next(err);
+                }
+
+                if (authenticatedUser) {
+                    authService.logOut(req, authenticatedUser, function(err) {
+                        if (err) {
+                            return next(err);
+                        }
+
+                        var userId = config.userIdGetter(authenticatedUser);
+                        userStore.remove(userId, function(err) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            unregisteredOkResponse(res);
+                        });
+                    });
+                } else {
+                    authService.responses.unauthenticated(res);
+                }
+            });
+        });
 
         // TODO: Forgot password. * Rendering email *
         // app.post('/forgotPassword', ... send email);

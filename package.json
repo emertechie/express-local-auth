@@ -22,6 +22,7 @@
   "devDependencies": {
     "chai": "*",
     "mocha": "*",
-    "supertest": "~0.13.0"
+    "supertest": "~0.13.0",
+    "lodash": "~2.4.1"
   }
 }

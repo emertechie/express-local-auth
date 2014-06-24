@@ -1,5 +1,5 @@
 {
-  "name": "sentinel-registration",
+  "name": "sentry-registration",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
@@ -11,9 +11,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@bitbucket.org:emertechie/sentinel-registration.git"
+    "url": "git@github.com:emertechie/sentry-registration.git"
   },
-  "author": "emertechie@gmail.com",
+  "author": "Andrew Smith <emertechie@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "express": "~4.4.3",

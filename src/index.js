@@ -1,4 +1,6 @@
 var express = require('express'),
+    expressValidator = require('express-validator'),
+    bodyParser = require('body-parser'),
     _ = require('lodash');
 
 module.exports = function(options) {
@@ -19,6 +21,9 @@ module.exports = function(options) {
                 var userId = userIdGetter(user);
                 res.send(201, JSON.stringify(userId));
             },
+            registrationValidationErrors: function(validationErrors, req, res) {
+                res.json(400, validationErrors);
+            },
             unregistered: function(res) {
                 res.send(200);
             }
@@ -32,15 +37,23 @@ module.exports = function(options) {
 
             var router = express.Router();
 
+            router.use(bodyParser());
+            router.use(expressValidator());
+
             router.post('/register', function (req, res) {
 
-                var email = req.param("email");
-                var username = req.param("username");
+                req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
+                req.checkBody('password', 'Password required').notEmpty();
+                var validationErrors = req.validationErrors(true);
+                if (validationErrors) {
+                    return responses.registrationValidationErrors(validationErrors, req, res);
+                }
 
+                var email = req.param('email');
                 var userDetails = {
                     email: email,
-                    username: username || email,
-                    password: req.param("password")
+                    username: req.param('username') || email,
+                    password: req.param('password')
                 };
 
                 register(req, userDetails, function (err, user) {

@@ -1,9 +1,9 @@
 var assert = require('chai').assert,
     express = require('express'),
-    bodyParser = require('body-parser'),
     request = require('supertest'),
     FakeUserStore = require('./fakes/userStore'),
     _ = require('lodash'),
+    sinon = require('sinon'),
     registration = require('../src/index');
 
 describe('Registration', function() {
@@ -52,7 +52,6 @@ describe('Registration', function() {
             var component = componentFactory(userStore, authService, emailService, config);
 
             app = express();
-            app.use(bodyParser());
             app.use(component.router);
 
             return app;
@@ -79,6 +78,33 @@ describe('Registration', function() {
                     callback(null);
                 }
             };
+        });
+
+        it('should require email address', function(done) {
+            configure();
+            request(app)
+                .post('/register')
+                .send({ email: '', password: 'bar'})
+                .expect(400, '{"email":{"param":"email","msg":"Valid email address required","value":""}}')
+                .end(done);
+        });
+
+        it('should require valid email address', function(done) {
+            configure();
+            request(app)
+                .post('/register')
+                .send({ email: 'foo', password: 'bar'})
+                .expect(400, '{"email":{"param":"email","msg":"Valid email address required","value":"foo"}}')
+                .end(done);
+        });
+
+        it('should require password', function(done) {
+            configure();
+            request(app)
+                .post('/register')
+                .send({ email: 'foo@example.com', password: ''})
+                .expect(400, '{"password":{"param":"password","msg":"Password required","value":""}}')
+                .end(done);
         });
 
         it('should allow registration with username, email and password', function(done) {
@@ -272,6 +298,23 @@ describe('Registration', function() {
                 .post('/register')
                 .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(201, expectedResponseBody)
+                .end(done);
+        });
+
+        it('can return custom registration validation error response', function(done) {
+            configure({
+                responses: {
+                    registrationValidationErrors: function(errors, req, res) {
+                        var invalidProps = _.keys(errors);
+                        res.send(400, 'Custom validation error message for ' + JSON.stringify(invalidProps))
+                    }
+                }
+            });
+
+            request(app)
+                .post('/register')
+                .send({ email: '', password: ''})
+                .expect(400, 'Custom validation error message for ["email","password"]')
                 .end(done);
         });
 

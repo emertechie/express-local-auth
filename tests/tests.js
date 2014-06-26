@@ -2,13 +2,14 @@ var assert = require('chai').assert,
     express = require('express'),
     request = require('supertest'),
     FakeUserStore = require('./fakes/userStore'),
+    FakeTokenStore = require('./fakes/tokenStore'),
     _ = require('lodash'),
     sinon = require('sinon'),
     registration = require('../src/index');
 
 describe('Registration', function() {
 
-    var app, userStore, authService, emailService, config, configure;
+    var app, userStore, passwordResetTokenStore, authService, emailService, config, configure;
 
     beforeEach(function() {
 
@@ -20,6 +21,7 @@ describe('Registration', function() {
         };
 
         userStore = new FakeUserStore();
+        passwordResetTokenStore = new FakeTokenStore();
 
         authService = {
             hashPassword: function(password, cb) {
@@ -41,6 +43,12 @@ describe('Registration', function() {
         emailService = {
             sendRegistrationEmail: function(userDetails, callback) {
                 callback(null);
+            },
+            sendPasswordResetEmail: function(user, cb) {
+                cb(null);
+            },
+            sendPasswordResetNotificationForUnregisteredEmail: function(email, cb) {
+                cb(null);
             }
         };
 
@@ -49,7 +57,7 @@ describe('Registration', function() {
             options.logger = { error: function(){} };
 
             var componentFactory = registration(options);
-            var component = componentFactory(userStore, authService, emailService, config);
+            var component = componentFactory(userStore, passwordResetTokenStore, authService, emailService, config);
 
             app = express();
             app.use(component.router);
@@ -343,9 +351,38 @@ describe('Registration', function() {
                     .end(done);
             });
         });
+
+        it('can return custom password reset email sent response', function(done) {
+
+            configure({
+                responses: {
+                    passwordResetEmailSent: function(email, res) {
+                        res.send(200, 'Custom response after password reset email sent to: ' + email);
+                    }
+                }
+            });
+
+            var unknownEmail = 'unknown_email@example.com';
+
+            request(app)
+                .post('/forgotpassword')
+                .send({ email: unknownEmail })
+                .expect(200, 'Custom response after password reset email sent to: unknown_email@example.com')
+                .end(done);
+        });
     });
 
     describe('Forgot Password', function() {
+
+        var existingUserEmail, existingUserPassword;
+
+        beforeEach(function() {
+            existingUserEmail = 'foo@example.com';
+            existingUserPassword = 'bar';
+
+            emailService.sendPasswordResetEmail = sinon.stub().yields(null);
+            emailService.sendPasswordResetNotificationForUnregisteredEmail = sinon.stub().yields(null);
+        });
 
         describe('Full Successful Password Reset Flow', function() {
             xit('should allow successful password reset', function(done) {
@@ -355,30 +392,150 @@ describe('Registration', function() {
 
         describe('Step 1 - Requesting Reset', function() {
 
-            xit('sends password reset email for existing account on entering matching email', function(done) {
+            it('requires valid email', function(done) {
                 configure();
-
-                /*request(app)
+                request(app)
                     .post('/forgotpassword')
-                    .set({ email:  })*/
-
-                // todo
+                    .send({ email: '' })
+                    .expect(400, '{"email":{"param":"email","msg":"Valid email address required","value":""}}')
+                    .end(done);
             });
 
-            xit('sends reset attempt notification email on entering unknown email', function(done) {
-                // todo
+            it('sends password reset email for existing account on entering matching email', function(done) {
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    request(app)
+                        .post('/forgotpassword')
+                        .send({ email: existingUserEmail })
+                        .expect(200)
+                        .expect(function() {
+                            var emailSentOk = emailService.sendPasswordResetEmail
+                                .calledWith(sinon.match.has("email", existingUserEmail));
+                            assert.isTrue(emailSentOk, 'Sends email');
+                        })
+                        .end(done);
+                });
+            });
+
+            it('sends reset attempt notification email on entering unknown email', function(done) {
+                configure();
+
+                var unknownEmail = 'unknown_email@example.com';
+
+                request(app)
+                    .post('/forgotpassword')
+                    .send({ email: unknownEmail })
+                    .expect(200)
+                    .expect(function() {
+                        var called = emailService.sendPasswordResetNotificationForUnregisteredEmail.calledWith(unknownEmail);
+                        assert.isTrue(called, 'Sends notification email');
+                    })
+                    .end(done);
             });
 
             xit('ensures user account not locked after sending password reset email to counter malicious reset requests', function(done) {
-                // todo
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    requestPasswordReset(existingUserEmail, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        // TODO: HOW TO TEST THIS?
+
+                        done();
+                    });
+                });
             });
 
-            xit('ensures password reset URL does not contain any user identifiers to prevent guessing', function(done) {
-                // todo
+            it('stores new password reset token for email', function(done) {
+                configure();
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+
+                        var tokenDetails = passwordResetTokenStore.tokens[0];
+                        assert.equal(tokenDetails.email, existingUserEmail);
+                        assert.isNotNull(tokenDetails.token);
+                        assert.isNotNull(tokenDetails.expiry);
+
+                        done();
+                    });
+                });
             });
 
-            xit('invalidates any pending reset requests on receipt of a new password reset request', function(done) {
-                // todo
+            it('ensures password reset token does not contain any user identifiers to prevent guessing', function(done) {
+                var email = 'user@example.com';
+                var expectedUserId = 'User#1';
+
+                configure();
+                registerUser(email, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(email, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        // Double-check the user ID is what we expect
+                        assert.lengthOf(userStore.users, 1);
+                        assert.equal(userStore.users[0].userId, expectedUserId);
+
+                        var emailSentOk = emailService.sendPasswordResetEmail.calledWith(
+                            sinon.match.has("email", email),
+                            sinon.match(/^((?!user).)*$/i) // makes sure 'user' not present - which covers email address and user id
+                        );
+                        assert.isTrue(emailSentOk, 'Password reset URL does not contain any user identifier');
+
+                        done();
+                    });
+                });
+            });
+
+            xit('deletes any pending reset tokens for same email on receipt of a new password reset request', function(done) {
+                configure();
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                        assert.equal(passwordResetTokenStore.tokens[0].tokenId, 'Token#1');
+
+                        requestPasswordReset(existingUserEmail, function (err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                            assert.equal(passwordResetTokenStore.tokens[0].tokenId, 'Token#2');
+
+                            done();
+                        });
+                    });
+                });
             });
         });
 
@@ -425,11 +582,14 @@ describe('Registration', function() {
             .post('/register')
             .send({ email: email, password: password})
             .expect(201)
-            .end(function(err, res) {
-                if (err) {
-                    return done(err);
-                }
-                cb(null, res);
-            });
+            .end(cb);
+    }
+
+    function requestPasswordReset(email, cb) {
+        request(app)
+            .post('/forgotpassword')
+            .send({ email: email })
+            .expect(200)
+            .end(cb);
     }
 });

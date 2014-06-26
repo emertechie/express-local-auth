@@ -1,16 +1,21 @@
 var express = require('express'),
     expressValidator = require('express-validator'),
     bodyParser = require('body-parser'),
-    _ = require('lodash');
+    _ = require('lodash'),
+    uuid = require('node-uuid');
 
 module.exports = function(options) {
 
-    options = options || {};
-    var logger = options.logger || console;
+    options = _.defaults(options || {}, {
+        tokenExpirationMins: 60,
+        logger: console
+    });
 
-    return function RegistrationComponentFactory(userStore, authService, emailService, config) {
+    var logger = options.logger;
 
-        if (!userStore || !authService || !emailService || !config) {
+    return function RegistrationComponentFactory(userStore, passwordResetTokenStore, authService, emailService, config) {
+
+        if (!userStore || !passwordResetTokenStore || !authService || !emailService || !config) {
             throw new Error('Required parameters missing');
         }
 
@@ -26,6 +31,12 @@ module.exports = function(options) {
             },
             unregistered: function(res) {
                 res.send(200);
+            },
+            requestPasswordResetValidationErrors:  function(validationErrors, req, res) {
+                res.json(400, validationErrors);
+            },
+            passwordResetEmailSent: function(email, res) {
+                res.send(200, 'Password reset email sent to: ' + email);
             }
         });
 
@@ -92,8 +103,57 @@ module.exports = function(options) {
                 });
             });
 
-            // TODO: Forgot password. * Rendering email *
-            // app.post('/forgotPassword', ... send email);
+            router.post('/forgotpassword', function(req, res, next) {
+
+                req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
+                var validationErrors = req.validationErrors(true);
+                if (validationErrors) {
+                    return responses.requestPasswordResetValidationErrors(validationErrors, req, res);
+                }
+
+                var email = req.body.email;
+
+                userStore.findByEmail(email, function(err, user) {
+                    if (err) {
+                        return next(err);
+                    }
+
+                    if (user) {
+                        var tokenObj = {
+                            email: email,
+                            token: uuid.v4(),
+                            expiry: new Date(Date.now() + (options.tokenExpirationMins * 60 * 1000))
+                        };
+
+                        /*passwordResetTokenStore.findByEmail(email, function(err, tokenObjs) {
+                            tokenObjs = tokenObjs || [];
+                            _.each(tokenObjs, function(tokenObj) {
+                                passwordResetTokenStore.remove();
+                            });
+                        });*/
+
+                        passwordResetTokenStore.add(tokenObj, function(err) {
+                            if (err) {
+                                return next(err);
+                            }
+                            emailService.sendPasswordResetEmail(user, tokenObj.token, function(err) {
+                                if (err) {
+                                    return next(err);
+                                }
+                                responses.passwordResetEmailSent(email, res);
+                            });
+                        });
+                    } else {
+                        emailService.sendPasswordResetNotificationForUnregisteredEmail(email, function(err) {
+                            if (err) {
+                                return next(err);
+                            }
+                            responses.passwordResetEmailSent(email, res);
+                        });
+                    }
+                });
+            });
+
             // app.post('/forgotPassword/callback', ... send email);
 
             // TODO: Callback to verify email

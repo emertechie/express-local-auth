@@ -5,14 +5,10 @@ function FakeUserStore() {
 }
 
 FakeUserStore.prototype.add = function(userDetails, callback) {
-    if (this.simulatedError) {
-        callback(simulatedError, null);
-    } else {
-        var user = clone(userDetails);
-        user.userId = this.fakeUserId || ('User#' + (this.users.length + 1));
-        this.users.push(user);
-        callback(null, user);
-    }
+    var user = clone(userDetails);
+    user.userId = this.fakeUserId || ('User#' + (this.users.length + 1));
+    this.users.push(user);
+    callback(null, user);
 };
 
 FakeUserStore.prototype.remove = function(userId, callback) {
@@ -20,6 +16,13 @@ FakeUserStore.prototype.remove = function(userId, callback) {
         return user.userId === userId;
     });
     callback(null);
+};
+
+FakeUserStore.prototype.findByEmail = function(email, callback) {
+    var found = _.find(this.users, function(user) {
+        return user.email === email;
+    });
+    callback(null, found);
 };
 
 function clone(obj) {

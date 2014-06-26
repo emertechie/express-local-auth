@@ -81,19 +81,41 @@ describe('Registration', function() {
             };
         });
 
-        it('should allow registration with username and password', function(done) {
+        it('should allow registration with username, email and password', function(done) {
             configure();
 
             assert.lengthOf(userStore.users, 0);
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ username: 'foo', email: 'foo@example.com', password: 'bar'})
                 .expect(201)
                 .expect(function() {
                     assert.lengthOf(userStore.users, 1);
                     assert.deepEqual(userStore.users[0], {
                         username: 'foo',
+                        email: 'foo@example.com',
+                        userId: "User#1",
+                        hashedPassword: 'HASHED-bar'
+                    });
+                })
+                .end(done);
+        });
+
+        it('should allow registration with just email and password and username defaults to email', function(done) {
+            configure();
+
+            assert.lengthOf(userStore.users, 0);
+
+            request(app)
+                .post('/register')
+                .send({ email: 'foo@example.com', password: 'bar'})
+                .expect(201)
+                .expect(function() {
+                    assert.lengthOf(userStore.users, 1);
+                    assert.deepEqual(userStore.users[0], {
+                        username: 'foo@example.com',
+                        email: 'foo@example.com',
                         userId: "User#1",
                         hashedPassword: 'HASHED-bar'
                     });
@@ -107,7 +129,7 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(function() {
                     assert.lengthOf(userStore.users, 1);
                     assert.isUndefined(userStore.users[0].password);
@@ -123,7 +145,7 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(function() {
                     assert.equal(loggedInUserId, userId);
                 })
@@ -138,7 +160,7 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(500, simlulatedLogInErr)
                 .end(done);
         });
@@ -150,9 +172,10 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', username: 'foo', password: 'bar'})
                 .expect(function() {
                     assert.equal(userDetailsSeenForRegEmail.userId, 99);
+                    assert.equal(userDetailsSeenForRegEmail.email, 'foo@example.com');
                     assert.equal(userDetailsSeenForRegEmail.username, 'foo');
                 })
                 .end(done);
@@ -166,7 +189,7 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(201, userId.toString())
                 .end(done);
         });
@@ -175,12 +198,13 @@ describe('Registration', function() {
     describe('User Unregistration', function() {
 
         it('should allow authenticated user to unregister', function(done) {
-            var username = 'foo';
+            var email = 'foo@example.com';
             var password = 'bar';
 
             authService.isAuthenticated = function(req, cb) {
                 var authenticatedUser = {
-                    username: username,
+                    email: email,
+                    username: email,
                     password: password
                 };
                 cb(null, authenticatedUser);
@@ -188,7 +212,7 @@ describe('Registration', function() {
 
             configure();
 
-            registerUser(username, password, function(err) {
+            registerUser(email, password, function(err) {
                 if (err) {
                     return done(err);
                 }
@@ -201,7 +225,7 @@ describe('Registration', function() {
         });
 
         it('should not allow unauthenticated user to unregister', function(done) {
-            var username = 'foo';
+            var email = 'foo@example.com';
             var password = 'bar';
 
             authService.isAuthenticated = function(req, cb) {
@@ -211,7 +235,7 @@ describe('Registration', function() {
 
             configure();
 
-            registerUser(username, password, function(err) {
+            registerUser(email, password, function(err) {
                 if (err) {
                     return done(err);
                 }
@@ -246,15 +270,15 @@ describe('Registration', function() {
 
             request(app)
                 .post('/register')
-                .send({ username: 'foo', password: 'bar'})
+                .send({ email: 'foo@example.com', password: 'bar'})
                 .expect(201, expectedResponseBody)
                 .end(done);
         });
 
         it('can return custom unregistered response', function(done) {
-            var username = 'foo';
+            var email = 'foo@example.com';
             var password = 'bar';
-            setupAuthServiceToAuthenticateUser(username, password);
+            setupAuthServiceToAuthenticateUser(email, password);
 
             configure({
                 responses: {
@@ -264,7 +288,7 @@ describe('Registration', function() {
                 }
             });
 
-            registerUser(username, password, function(err) {
+            registerUser(email, password, function(err) {
                 if (err) {
                     return done(err);
                 }
@@ -278,20 +302,85 @@ describe('Registration', function() {
         });
     });
 
-    function setupAuthServiceToAuthenticateUser(username, password) {
+    describe('Forgot Password', function() {
+
+        describe('Full Successful Password Reset Flow', function() {
+            xit('should allow successful password reset', function(done) {
+                // todo
+            });
+        });
+
+        describe('Step 1 - Requesting Reset', function() {
+
+            xit('sends password reset email for existing account on entering matching email', function(done) {
+                configure();
+
+                /*request(app)
+                    .post('/forgotpassword')
+                    .set({ email:  })*/
+
+                // todo
+            });
+
+            xit('sends reset attempt notification email on entering unknown email', function(done) {
+                // todo
+            });
+
+            xit('ensures user account not locked after sending password reset email to counter malicious reset requests', function(done) {
+                // todo
+            });
+
+            xit('ensures password reset URL does not contain any user identifiers to prevent guessing', function(done) {
+                // todo
+            });
+
+            xit('invalidates any pending reset requests on receipt of a new password reset request', function(done) {
+                // todo
+            });
+        });
+
+        describe('Step 2 - Visiting Reset URL', function() {
+
+            xit('ensures invalid password request tokens are ignored', function(done) {
+                // todo
+            });
+
+            xit('ensures that password reset request is only valid for limited period of time', function(done) {
+                // todo
+                // maybe set up PasswordResetTokenStore with a predefined record with a timestamp < now and test it fails
+            });
+        });
+
+        describe('Step 3 - Changing Password', function() {
+            xit('allows password to be changed', function(done) {
+                // todo
+            });
+
+            xit('deletes password reset token after password changed', function(done) {
+                // todo
+            });
+
+            xit('emails user confirmation of change after password changed', function(done) {
+                // todo
+            });
+        });
+    });
+    
+    function setupAuthServiceToAuthenticateUser(email, password) {
         authService.isAuthenticated = function(req, cb) {
             var authenticatedUser = {
-                username: username,
+                email: email,
+                username: email,
                 password: password
             };
             cb(null, authenticatedUser);
         };
     }
 
-    function registerUser(username, password, cb) {
+    function registerUser(email, password, cb) {
         request(app)
             .post('/register')
-            .send({ username: username, password: password})
+            .send({ email: email, password: password})
             .expect(201)
             .end(function(err, res) {
                 if (err) {

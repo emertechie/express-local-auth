@@ -34,8 +34,12 @@ module.exports = function(options) {
 
             router.post('/register', function (req, res) {
 
+                var email = req.param("email");
+                var username = req.param("username");
+
                 var userDetails = {
-                    username: req.param("username"),
+                    email: email,
+                    username: username || email,
                     password: req.param("password")
                 };
 
@@ -97,8 +101,8 @@ module.exports = function(options) {
         }
 
         function register(req, userDetails, callback) {
-            if (!userDetails.username || !userDetails.password) {
-                return callback(makeError(400, 'Must provide username & password'));
+            if (!userDetails.email || !userDetails.password) {
+                return callback(makeError(400, 'Must provide email & password'));
             }
 
             authService.hashPassword(userDetails.password, function(err, hashedPassword) {

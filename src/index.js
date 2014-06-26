@@ -2,7 +2,8 @@ var express = require('express'),
     expressValidator = require('express-validator'),
     bodyParser = require('body-parser'),
     _ = require('lodash'),
-    uuid = require('node-uuid');
+    uuid = require('node-uuid'),
+    async = require('async');
 
 module.exports = function(options) {
 
@@ -125,23 +126,21 @@ module.exports = function(options) {
                             expiry: new Date(Date.now() + (options.tokenExpirationMins * 60 * 1000))
                         };
 
-                        /*passwordResetTokenStore.findByEmail(email, function(err, tokenObjs) {
-                            tokenObjs = tokenObjs || [];
-                            _.each(tokenObjs, function(tokenObj) {
-                                passwordResetTokenStore.remove();
-                            });
-                        });*/
-
-                        passwordResetTokenStore.add(tokenObj, function(err) {
+                        async.waterfall([
+                            function(callback) {
+                                passwordResetTokenStore.removeByEmail(email, callback);
+                            },
+                            function(callback) {
+                                passwordResetTokenStore.add(tokenObj, callback);
+                            },
+                            function(addedToken, callback) {
+                                emailService.sendPasswordResetEmail(user, tokenObj.token, callback);
+                            }
+                        ], function(err) {
                             if (err) {
                                 return next(err);
                             }
-                            emailService.sendPasswordResetEmail(user, tokenObj.token, function(err) {
-                                if (err) {
-                                    return next(err);
-                                }
-                                responses.passwordResetEmailSent(email, res);
-                            });
+                            responses.passwordResetEmailSent(email, res);
                         });
                     } else {
                         emailService.sendPasswordResetNotificationForUnregisteredEmail(email, function(err) {

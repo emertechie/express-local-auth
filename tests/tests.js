@@ -510,7 +510,7 @@ describe('Registration', function() {
                 });
             });
 
-            xit('deletes any pending reset tokens for same email on receipt of a new password reset request', function(done) {
+            it('deletes any pending reset tokens for same email on receipt of a new password reset request', function(done) {
                 configure();
                 registerUser(existingUserEmail, existingUserPassword, function(err) {
                     if (err) {

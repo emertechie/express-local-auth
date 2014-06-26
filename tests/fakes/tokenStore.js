@@ -12,16 +12,16 @@ FakeTokenStore.prototype.add = function(tokenDetails, callback) {
     callback(null, cloned);
 };
 
-FakeTokenStore.prototype.remove = function(tokenId, callback) {
+FakeTokenStore.prototype.removeByEmail = function(email, callback) {
     _.remove(this.tokens, function(token) {
-        return token.tokenId === tokenId;
+        return token.email === email;
     });
     callback(null);
 };
 
 FakeTokenStore.prototype.findByToken = function(token, callback) {
-    var found = _.find(this.tokens, function(user) {
-        return user.token === token;
+    var found = _.find(this.tokens, function(token) {
+        return token.token === token;
     });
     callback(null, found);
 };

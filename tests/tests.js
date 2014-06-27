@@ -25,7 +25,7 @@ describe('Registration', function() {
 
         authService = {
             hashPassword: function(password, cb) {
-                cb(null, 'HASHED-' + password);
+                cb(null, 'hashed-' + password);
             },
             markLoggedInAfterAuthentication: function(req, user, callback) {
                 callback(null);
@@ -41,13 +41,16 @@ describe('Registration', function() {
         };
 
         emailService = {
-            sendRegistrationEmail: function(userDetails, callback) {
-                callback(null);
+            sendRegistrationEmail: function(user, cb) {
+                cb(null);
             },
             sendPasswordResetEmail: function(user, cb) {
                 cb(null);
             },
             sendPasswordResetNotificationForUnregisteredEmail: function(email, cb) {
+                cb(null);
+            },
+            sendPasswordChangedEmail: function(user, cb) {
                 cb(null);
             }
         };
@@ -130,7 +133,7 @@ describe('Registration', function() {
                         username: 'foo',
                         email: 'foo@example.com',
                         userId: "User#1",
-                        hashedPassword: 'HASHED-bar'
+                        hashedPassword: 'hashed-bar'
                     });
                 })
                 .end(done);
@@ -151,7 +154,7 @@ describe('Registration', function() {
                         username: 'foo@example.com',
                         email: 'foo@example.com',
                         userId: "User#1",
-                        hashedPassword: 'HASHED-bar'
+                        hashedPassword: 'hashed-bar'
                     });
                 })
                 .end(done);
@@ -366,12 +369,6 @@ describe('Registration', function() {
             emailService.sendPasswordResetNotificationForUnregisteredEmail = sinon.stub().yields(null);
         });
 
-        describe('Full Successful Password Reset Flow', function() {
-            xit('should allow successful password reset', function(done) {
-                // todo
-            });
-        });
-
         describe('Step 1 - Requesting Reset', function() {
 
             it('requires valid email', function(done) {
@@ -396,8 +393,9 @@ describe('Registration', function() {
                         .send({ email: existingUserEmail })
                         .expect(200)
                         .expect(function() {
-                            var emailSentOk = emailService.sendPasswordResetEmail
-                                .calledWith(sinon.match.has("email", existingUserEmail));
+                            var emailSentOk = emailService.sendPasswordResetEmail.calledWith(
+                                sinon.match.has("email", existingUserEmail)
+                            );
                             assert.isTrue(emailSentOk, 'Sends email');
                         })
                         .end(done);
@@ -420,7 +418,7 @@ describe('Registration', function() {
                     .end(done);
             });
 
-            xit('ensures user account not locked after sending password reset email to counter malicious reset requests', function(done) {
+            /*xit('ensures user account not locked after sending password reset email to counter malicious reset requests', function(done) {
                 configure();
 
                 registerUser(existingUserEmail, existingUserPassword, function(err) {
@@ -438,7 +436,7 @@ describe('Registration', function() {
                         done();
                     });
                 });
-            });
+            });*/
 
             it('stores new password reset token for email', function(done) {
                 configure();
@@ -455,6 +453,7 @@ describe('Registration', function() {
 
                         var tokenDetails = passwordResetTokenStore.tokens[0];
                         assert.equal(tokenDetails.email, existingUserEmail);
+                        assert.equal(tokenDetails.userId, "User#1");
                         assert.isNotNull(tokenDetails.token);
                         assert.isNotNull(tokenDetails.expiry);
 
@@ -598,7 +597,8 @@ describe('Registration', function() {
 
                         request(app)
                             .get('/forgotpassword/callback?token=' + token)
-                            .expect(200, 'Update password')
+                            // obviously using
+                            .expect(200, '{"token":"' + token + '"}')
                             .end(done);
                     });
                 });
@@ -606,11 +606,11 @@ describe('Registration', function() {
 
             describe('Custom Responses', function() {
 
-                it('can render custom bad password reset token page', function(done) {
+                it('can render custom invalid token page', function(done) {
                     configure({
                         responses: {
-                            badPasswordResetTokenResponse: function(res) {
-                                res.send(400, 'Custom bad token response');
+                            passwordResetCallbackInvalidToken: function(res) {
+                                res.send(400, 'Custom invalid token response');
                             }
                         }
                     });
@@ -628,7 +628,7 @@ describe('Registration', function() {
 
                             request(app)
                                 .get('/forgotpassword/callback?token=' + expiredToken)
-                                .expect(400, 'Custom bad token response')
+                                .expect(400, 'Custom invalid token response')
                                 .end(done);
                         });
                     });
@@ -637,8 +637,8 @@ describe('Registration', function() {
                 it('can render custom password reset page', function(done) {
                     configure({
                         responses: {
-                            resetPasswordPage: function(res) {
-                                res.send(200, 'Custom update password response');
+                            passwordResetPage: function(token, res) {
+                                res.send(200, 'Custom update password response with token: ' + token);
                             }
                         }
                     });
@@ -657,39 +657,264 @@ describe('Registration', function() {
 
                             request(app)
                                 .get('/forgotpassword/callback?token=' + token)
-                                .expect(200, 'Custom update password response')
+                                .expect(200, 'Custom update password response with token: ' + token)
                                 .end(done);
                         });
                     });
                 });
             });
-
-            function setupExpiredPasswordResetToken() {
-
-                // Make sure only 1 token in store and that it looks legit
-                assert.lengthOf(passwordResetTokenStore.tokens, 1);
-                var tokenObj = passwordResetTokenStore.tokens[0];
-                assert.isNotNull(tokenObj.expiry);
-                assert.typeOf(tokenObj.expiry, 'date');
-
-                // expire token:
-                tokenObj.expiry = new Date(Date.now() - 1);
-
-                return tokenObj.token;
-            }
         });
 
         describe('Step 3 - Changing Password', function() {
-            xit('allows password to be changed', function(done) {
-                // todo
+
+            it('ensures token is required', function(done) {
+                configure();
+                request(app)
+                    .post('/changepassword')
+                    .send({ password: 'foo', confirmPassword: 'foo', token: '' })
+                    .expect(400, generateExpectedParamErrorMsg('token', 'Password reset token required', ''))
+                    .end(done);
             });
 
-            xit('deletes password reset token after password changed', function(done) {
-                // todo
+            it('ensures password is required', function(done) {
+                configure();
+                request(app)
+                    .post('/changepassword')
+                    .send({ password: '', confirmPassword: 'foo', token: 'bar' })
+                    .expect(400, generateExpectedParamErrorMsg('password', 'New password required', ''))
+                    .end(done);
             });
 
-            xit('emails user confirmation of change after password changed', function(done) {
-                // todo
+            it('ensures confirm password is required', function(done) {
+                configure();
+                request(app)
+                    .post('/changepassword')
+                    .send({ password: 'foo', confirmPassword: '', token: 'bar' })
+                    .expect(400, generateExpectedParamErrorMsg('confirmPassword', 'Password confirmation required', ''))
+                    .end(done);
+            });
+
+            it('ensures password matches confirm password', function(done) {
+                configure();
+                request(app)
+                    .post('/changepassword')
+                    .send({ password: 'foo', confirmPassword: 'not-foo', token: 'bar' })
+                    .expect(400, generateExpectedParamErrorMsg('confirmPassword', 'Password and confirm password do not match', 'not-foo'))
+                    .end(done);
+            });
+
+            it('ensures invalid password request tokens are ignored', function(done) {
+                configure();
+                request(app)
+                    .post('/changepassword')
+                    .send({ password: 'foo', confirmPassword: 'foo', token: 'unknown-token' })
+                    .expect(400, 'Unknown or expired token')
+                    .end(done);
+            });
+
+            it('ensures password reset tokens for unknown users are ignored', function(done) {
+                var token;
+                capturePasswordResetToken(function(_token) {
+                    token = _token;
+                });
+
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        // Set up an unknown user ID:
+                        assert.lengthOf(userStore.users, 1);
+                        var user = userStore.users[0];
+                        user.userId = 'Unknown-User';
+
+                        request(app)
+                            .post('/changepassword')
+                            .send({ password: 'foo', confirmPassword: 'foo', token: token })
+                            .expect(400, 'Unknown or expired token')
+                            .end(done);
+                    });
+                });
+            });
+
+            it('allows password to be changed', function(done) {
+                var token;
+                capturePasswordResetToken(function(_token) {
+                    token = _token;
+                });
+
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        var newPassword = existingUserPassword + '-new';
+
+                        request(app)
+                            .post('/changepassword')
+                            .send({ password: newPassword, confirmPassword: newPassword, token: token })
+                            .expect(200, 'Password has been changed')
+                            .expect(function() {
+                                assert.lengthOf(userStore.users, 1);
+                                var user = userStore.users[0];
+                                assert.equal(user.hashedPassword, 'hashed-' + newPassword);
+                            })
+                            .end(done);
+                    });
+                });
+            });
+
+            it('deletes password reset token after password changed', function(done) {
+                var token;
+                capturePasswordResetToken(function(_token) {
+                    token = _token;
+                });
+
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+
+                        changePassword(token, 'new-password', function(err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            assert.lengthOf(passwordResetTokenStore.tokens, 0);
+                            done();
+                        });
+                    });
+                });
+            });
+
+            it('emails user confirmation of change after password changed', function(done) {
+                var token;
+                capturePasswordResetToken(function(_token) {
+                    token = _token;
+                });
+
+                emailService.sendPasswordChangedEmail = sinon.stub().yields(null);
+
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        changePassword(token, 'new-password', function(err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            assert.isTrue(emailService.sendPasswordChangedEmail.calledWith(
+                                sinon.match.has('email', existingUserEmail)
+                            ));
+
+                            done();
+                        });
+                    });
+                });
+            });
+
+            describe('Custom responses', function() {
+
+                it('can return custom change password validation errors page', function(done) {
+                    configure({
+                        responses: {
+                            resetPasswordValidationErrors: function(errors, req, res) {
+                                res.send(400, 'Custom validation error page');
+                            }
+                        }
+                    });
+
+                    request(app)
+                        .post('/changepassword')
+                        .send({ password: 'foo', confirmPassword: 'foo', token: '' })
+                        .expect(400, 'Custom validation error page')
+                        .end(done);
+                });
+
+                it('can return custom invalid token page when visiting callback', function(done) {
+                    configure({
+                        responses: {
+                            passwordResetCallbackInvalidToken: function(res) {
+                                res.send(400, 'Custom invalid token response');
+                            }
+                        }
+                    });
+
+                    registerUser(existingUserEmail, existingUserPassword, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+                        requestPasswordReset(existingUserEmail, function (err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            var expiredToken = setupExpiredPasswordResetToken();
+
+                            request(app)
+                                .get('/forgotpassword/callback?token=' + expiredToken)
+                                .expect(400, 'Custom invalid token response')
+                                .end(done);
+                        });
+                    });
+                });
+
+                it('can return custom invalid token page when changing password', function(done) {
+                    configure({
+                        responses: {
+                            changePasswordInvalidToken: function(res) {
+                                res.send(400, 'Custom invalid token response');
+                            }
+                        }
+                    });
+
+                    registerUser(existingUserEmail, existingUserPassword, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+                        requestPasswordReset(existingUserEmail, function (err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            var expiredToken = setupExpiredPasswordResetToken();
+
+                            request(app)
+                                .post('/changepassword')
+                                .send({ password: 'foo', confirmPassword: 'foo', token: expiredToken })
+                                .expect(400, 'Custom invalid token response')
+                                .end(done);
+                        });
+                    });
+                });
             });
         });
     });
@@ -719,5 +944,38 @@ describe('Registration', function() {
             .send({ email: email })
             .expect(200)
             .end(cb);
+    }
+
+    function setupExpiredPasswordResetToken() {
+
+        // Make sure only 1 token in store and that it looks legit
+        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+        var tokenObj = passwordResetTokenStore.tokens[0];
+        assert.isNotNull(tokenObj.expiry);
+        assert.typeOf(tokenObj.expiry, 'date');
+
+        // expire token:
+        tokenObj.expiry = new Date(Date.now() - 1);
+
+        return tokenObj.token;
+    }
+
+    function capturePasswordResetToken(callback) {
+        emailService.sendPasswordResetEmail = function(user, token, cb) {
+            callback(token);
+            cb(null);
+        };
+    }
+
+    function changePassword(token, newPassword, cb) {
+        request(app)
+            .post('/changepassword')
+            .send({ password: newPassword, confirmPassword: newPassword, token: token })
+            .expect(200, 'Password has been changed')
+            .end(cb);
+    }
+
+    function generateExpectedParamErrorMsg(paramName, message, value) {
+        return '{"' + paramName + '":{"param":"' + paramName + '","msg":"' + message + '","value":"' + value + '"}}'
     }
 });

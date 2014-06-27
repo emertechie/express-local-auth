@@ -11,6 +11,26 @@ FakeUserStore.prototype.add = function(userDetails, callback) {
     callback(null, user);
 };
 
+FakeUserStore.prototype.get = function(userId, cb) {
+    var user = _.find(this.users, function(user) {
+        return user.userId === userId;
+    });
+    cb(null, user);
+};
+
+FakeUserStore.prototype.update = function(user, callback) {
+    var userIdx = _.findIndex(this.users, function(candidateUser) {
+        return candidateUser.userId === user.userId;
+    });
+
+    if (userIdx === -1) {
+        return callback(null, false);
+    }
+
+    this.users[userIdx] = clone(user);
+    return callback(null, true);
+};
+
 FakeUserStore.prototype.remove = function(userId, callback) {
     _.remove(this.users, function(user) {
         return user.userId === userId;

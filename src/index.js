@@ -7,6 +7,11 @@ var express = require('express'),
 
 module.exports = function(options) {
 
+    expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
+        var valueToMatch = req.param(expectedMatchParam);
+        return str === valueToMatch;
+    });
+
     options = _.defaults(options || {}, {
         tokenExpirationMins: 60,
         logger: console
@@ -22,31 +27,36 @@ module.exports = function(options) {
 
         var userIdGetter = config.userIdGetter;
 
+        var validationErrorsRespose = function(validationErrors, req, res) {
+            res.json(400, validationErrors);
+        };
+
+        var invalidTokenRespose = function(res) {
+            res.send(400, 'Unknown or expired token');
+        };
+
         var responses = _.defaults(options.responses || {}, {
             registered: function(user, res) {
                 var userId = userIdGetter(user);
                 res.send(201, JSON.stringify(userId));
             },
-            registrationValidationErrors: function(validationErrors, req, res) {
-                res.json(400, validationErrors);
-            },
+            registrationValidationErrors: validationErrorsRespose,
             unregistered: function(res) {
                 res.send(200);
             },
-            requestPasswordResetValidationErrors:  function(validationErrors, req, res) {
-                res.json(400, validationErrors);
-            },
+            requestPasswordResetValidationErrors: validationErrorsRespose,
             passwordResetEmailSent: function(email, res) {
                 res.send(200, 'Password reset email sent to: ' + email);
             },
-            passwordResetCallbackValidationErrors:  function(validationErrors, req, res) {
-                res.json(400, validationErrors);
+            passwordResetCallbackValidationErrors: validationErrorsRespose,
+            passwordResetCallbackInvalidToken: invalidTokenRespose,
+            changePasswordInvalidToken: invalidTokenRespose,
+            passwordResetPage: function(token, res) {
+                res.json(200, { token: token });
             },
-            badPasswordResetTokenResponse: function(res) {
-                res.send(400, 'Unknown or expired token');
-            },
-            resetPasswordPage: function(res) {
-                res.send(200, 'Update password');
+            resetPasswordValidationErrors: validationErrorsRespose,
+            passwordChanged: function(res) {
+                res.send(200, 'Password has been changed');
             }
         });
 
@@ -65,9 +75,8 @@ module.exports = function(options) {
 
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                 req.checkBody('password', 'Password required').notEmpty();
-                var validationErrors = req.validationErrors(true);
-                if (validationErrors) {
-                    return responses.registrationValidationErrors(validationErrors, req, res);
+                if (returnValidationErrors(req, res, responses.registrationValidationErrors)) {
+                    return;
                 }
 
                 var email = req.param('email');
@@ -116,9 +125,8 @@ module.exports = function(options) {
             router.post('/forgotpassword', function(req, res, next) {
 
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
-                var validationErrors = req.validationErrors(true);
-                if (validationErrors) {
-                    return responses.requestPasswordResetValidationErrors(validationErrors, req, res);
+                if (returnValidationErrors(req, res, responses.requestPasswordResetValidationErrors)) {
+                    return;
                 }
 
                 var email = req.body.email;
@@ -131,13 +139,14 @@ module.exports = function(options) {
                     if (user) {
                         var tokenObj = {
                             email: email,
+                            userId: userIdGetter(user),
                             token: uuid.v4(),
                             expiry: new Date(Date.now() + (options.tokenExpirationMins * 60 * 1000))
                         };
 
                         async.waterfall([
                             function(callback) {
-                                passwordResetTokenStore.removeByEmail(email, callback);
+                                passwordResetTokenStore.removeAllByEmail(email, callback);
                             },
                             function(callback) {
                                 passwordResetTokenStore.add(tokenObj, callback);
@@ -165,38 +174,120 @@ module.exports = function(options) {
             router.get('/forgotpassword/callback', function(req, res, next) {
 
                 req.checkQuery('token', 'Password reset token required').notEmpty();
-                var validationErrors = req.validationErrors(true);
-                if (validationErrors) {
-                    return responses.passwordResetCallbackValidationErrors(validationErrors, req, res);
+                if (returnValidationErrors(req, res, responses.passwordResetCallbackValidationErrors)) {
+                    return;
                 }
 
                 var token = req.query.token;
 
-                passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
+                findAndVerifyToken(token, function(err, isValid) {
                     if (err) {
                         return next(err);
                     }
-
-                    var isValid =
-                        tokenDetails &&
-                        tokenDetails.expiry &&
-                        tokenDetails.expiry instanceof Date &&
-                        tokenDetails.expiry.getTime() >= Date.now();
-
                     if (isValid) {
-                        responses.resetPasswordPage(res);
+                        responses.passwordResetPage(token, res);
                     } else {
-                        responses.badPasswordResetTokenResponse(res);
+                        responses.passwordResetCallbackInvalidToken(res);
                     }
                 });
             });
 
-            // app.post('/forgotPassword/callback', ... send email);
+            router.post('/changepassword', function(req, res, next) {
+
+                req.checkBody('token', 'Password reset token required').notEmpty();
+                req.checkBody('password', 'New password required').notEmpty();
+                req.checkBody('confirmPassword', 'Password confirmation required').notEmpty();
+                if (returnValidationErrors(req, res, responses.resetPasswordValidationErrors)) {
+                    return;
+                }
+                // Only check confirm password after we know others are ok to avoid returning a redundant error
+                req.checkBody('confirmPassword', 'Password and confirm password do not match').matches('password', req);
+                if (returnValidationErrors(req, res, responses.resetPasswordValidationErrors)) {
+                    return;
+                }
+
+                var token = req.body.token;
+                var password = req.body.password;
+
+                findAndVerifyToken(token, function(err, isValid, tokenDetails) {
+                    if (err) {
+                        return next(err);
+                    }
+
+                    if (isValid) {
+
+                        authService.hashPassword(password, function(err, hashedPassword) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            userStore.get(tokenDetails.userId, function(err, user) {
+                                if (err) {
+                                    return next(err);
+                                }
+                                if (!user) {
+                                    return responses.changePasswordInvalidToken(res);
+                                }
+
+                                user.hashedPassword = hashedPassword;
+
+                                userStore.update(user, function(err) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+
+                                    passwordResetTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+
+                                        emailService.sendPasswordChangedEmail(user, function(err) {
+                                            if (err) {
+                                                logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
+                                            }
+                                            responses.passwordChanged(res);
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    } else {
+                        // todo: test for changePasswordInvalidToken
+                        responses.changePasswordInvalidToken(res);
+                    }
+                });
+            });
 
             // TODO: Callback to verify email
             // app.get('/verifyemail', ... userStore.emailVerified(userId));
 
+            function findAndVerifyToken(token, cb) {
+                passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    var isValid =
+                        tokenDetails &&
+                        tokenDetails.token &&
+                        tokenDetails.expiry &&
+                        tokenDetails.expiry instanceof Date &&
+                        tokenDetails.expiry.getTime() >= Date.now();
+
+                    cb(null, isValid, tokenDetails);
+                });
+            }
+
             return router;
+        }
+
+        function returnValidationErrors(req, res, responseGenerator) {
+            var validationErrors = req.validationErrors(true);
+            if (validationErrors) {
+                responseGenerator(validationErrors, req, res);
+                // responses.passwordResetCallbackValidationErrors(validationErrors, req, res);
+                return true;
+            }
         }
 
         function makeError(statusCodeOrError, message) {

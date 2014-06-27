@@ -12,7 +12,7 @@ FakeTokenStore.prototype.add = function(tokenDetails, callback) {
     callback(null, cloned);
 };
 
-FakeTokenStore.prototype.removeByEmail = function(email, callback) {
+FakeTokenStore.prototype.removeAllByEmail = function(email, callback) {
     _.remove(this.tokens, function(token) {
         return token.email === email;
     });

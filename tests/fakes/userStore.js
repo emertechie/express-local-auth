@@ -6,21 +6,21 @@ function FakeUserStore() {
 
 FakeUserStore.prototype.add = function(userDetails, callback) {
     var user = clone(userDetails);
-    user.userId = this.fakeUserId || ('User#' + (this.users.length + 1));
+    user.id = this.fakeUserId || ('User#' + (this.users.length + 1));
     this.users.push(user);
     callback(null, user);
 };
 
 FakeUserStore.prototype.get = function(userId, cb) {
     var user = _.find(this.users, function(user) {
-        return user.userId === userId;
+        return user.id === userId;
     });
     cb(null, user);
 };
 
 FakeUserStore.prototype.update = function(user, callback) {
     var userIdx = _.findIndex(this.users, function(candidateUser) {
-        return candidateUser.userId === user.userId;
+        return candidateUser.id === user.userId;
     });
 
     if (userIdx === -1) {
@@ -33,7 +33,7 @@ FakeUserStore.prototype.update = function(user, callback) {
 
 FakeUserStore.prototype.remove = function(userId, callback) {
     _.remove(this.users, function(user) {
-        return user.userId === userId;
+        return user.id === userId;
     });
     callback(null);
 };

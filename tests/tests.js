@@ -16,7 +16,7 @@ describe('Registration', function() {
         // todo: this is horrible. do something better
         config = {
             userIdGetter: function(user) {
-                return user.userId
+                return user.id
             }
         };
 
@@ -132,7 +132,7 @@ describe('Registration', function() {
                     assert.deepEqual(userStore.users[0], {
                         username: 'foo',
                         email: 'foo@example.com',
-                        userId: "User#1",
+                        id: "User#1",
                         hashedPassword: 'hashed-bar'
                     });
                 })
@@ -153,7 +153,7 @@ describe('Registration', function() {
                     assert.deepEqual(userStore.users[0], {
                         username: 'foo@example.com',
                         email: 'foo@example.com',
-                        userId: "User#1",
+                        id: "User#1",
                         hashedPassword: 'hashed-bar'
                     });
                 })
@@ -211,7 +211,7 @@ describe('Registration', function() {
                 .post('/register')
                 .send({ email: 'foo@example.com', username: 'foo', password: 'bar'})
                 .expect(function() {
-                    assert.equal(userDetailsSeenForRegEmail.userId, 99);
+                    assert.equal(userDetailsSeenForRegEmail.id, 99);
                     assert.equal(userDetailsSeenForRegEmail.email, 'foo@example.com');
                     assert.equal(userDetailsSeenForRegEmail.username, 'foo');
                 })
@@ -478,7 +478,7 @@ describe('Registration', function() {
 
                         // Double-check the user ID is what we expect
                         assert.lengthOf(userStore.users, 1);
-                        assert.equal(userStore.users[0].userId, expectedUserId);
+                        assert.equal(userStore.users[0].id, expectedUserId);
 
                         var emailSentOk = emailService.sendPasswordResetEmail.calledWith(
                             sinon.match.has("email", email),
@@ -732,7 +732,7 @@ describe('Registration', function() {
                         // Set up an unknown user ID:
                         assert.lengthOf(userStore.users, 1);
                         var user = userStore.users[0];
-                        user.userId = 'Unknown-User';
+                        user.id = 'Unknown-User';
 
                         request(app)
                             .post('/changepassword')

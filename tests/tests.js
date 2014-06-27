@@ -227,6 +227,50 @@ describe('Registration', function() {
                 .expect(201, userId.toString())
                 .end(done);
         });
+
+        describe('Custom Responses', function() {
+            it('can return custom successful registration response', function(done) {
+                var userId = 99;
+                userStore.fakeUserId = userId;
+
+                configure({
+                    responses: {
+                        registered: function(user, res) {
+                            res.send(201, JSON.stringify({
+                                transformed: config.userIdGetter(user)
+                            }));
+                        }
+                    }
+                });
+
+                var expectedResponseBody = JSON.stringify({
+                    transformed: userId
+                });
+
+                request(app)
+                    .post('/register')
+                    .send({ email: 'foo@example.com', password: 'bar'})
+                    .expect(201, expectedResponseBody)
+                    .end(done);
+            });
+
+            it('can return custom registration validation error response', function(done) {
+                configure({
+                    responses: {
+                        registrationValidationErrors: function(errors, req, res) {
+                            var invalidProps = _.keys(errors);
+                            res.send(400, 'Custom validation error message for ' + JSON.stringify(invalidProps))
+                        }
+                    }
+                });
+
+                request(app)
+                    .post('/register')
+                    .send({ email: '', password: ''})
+                    .expect(400, 'Custom validation error message for ["email","password"]')
+                    .end(done);
+            });
+        });
     });
 
     describe('User Unregistration', function() {
@@ -280,95 +324,33 @@ describe('Registration', function() {
                     .end(done);
             });
         });
-    });
 
-    describe('Custom Responses', function() {
+        describe('Custom Responses', function() {
+            it('can return custom unregistered response', function(done) {
+                var email = 'foo@example.com';
+                var password = 'bar';
+                setupAuthServiceToAuthenticateUser(email, password);
 
-        it('can return custom successful registration response', function(done) {
-            var userId = 99;
-            userStore.fakeUserId = userId;
-
-            configure({
-                responses: {
-                    registered: function(user, res) {
-                        res.send(201, JSON.stringify({
-                            transformed: config.userIdGetter(user)
-                        }));
+                configure({
+                    responses: {
+                        unregistered: function(res) {
+                            return res.redirect('/home');
+                        }
                     }
-                }
-            });
+                });
 
-            var expectedResponseBody = JSON.stringify({
-                transformed: userId
-            });
-
-            request(app)
-                .post('/register')
-                .send({ email: 'foo@example.com', password: 'bar'})
-                .expect(201, expectedResponseBody)
-                .end(done);
-        });
-
-        it('can return custom registration validation error response', function(done) {
-            configure({
-                responses: {
-                    registrationValidationErrors: function(errors, req, res) {
-                        var invalidProps = _.keys(errors);
-                        res.send(400, 'Custom validation error message for ' + JSON.stringify(invalidProps))
+                registerUser(email, password, function(err) {
+                    if (err) {
+                        return done(err);
                     }
-                }
+
+                    request(app)
+                        .post('/unregister')
+                        .expect(302)
+                        .expect('location', '/home')
+                        .end(done);
+                });
             });
-
-            request(app)
-                .post('/register')
-                .send({ email: '', password: ''})
-                .expect(400, 'Custom validation error message for ["email","password"]')
-                .end(done);
-        });
-
-        it('can return custom unregistered response', function(done) {
-            var email = 'foo@example.com';
-            var password = 'bar';
-            setupAuthServiceToAuthenticateUser(email, password);
-
-            configure({
-                responses: {
-                    unregistered: function(res) {
-                        return res.redirect('/home');
-                    }
-                }
-            });
-
-            registerUser(email, password, function(err) {
-                if (err) {
-                    return done(err);
-                }
-
-                request(app)
-                    .post('/unregister')
-                    .expect(302)
-                    .expect('location', '/home')
-                    .end(done);
-            });
-        });
-
-        it('can return custom password reset email sent response', function(done) {
-
-            configure({
-                responses: {
-                    passwordResetEmailSent: function(email, res) {
-                        res.send(200, 'Custom response after password reset email sent to: ' + email);
-                    }
-                }
-            });
-
-            var unknownEmail = 'unknown_email@example.com';
-
-            request(app)
-                .post('/forgotpassword')
-                .send({ email: unknownEmail })
-                .expect(200, 'Custom response after password reset email sent to: unknown_email@example.com')
-                .end(done);
         });
     });
 
@@ -537,6 +519,26 @@ describe('Registration', function() {
                     });
                 });
             });
+
+            describe('Custom Responses', function() {
+                it('can return custom password reset email sent response', function(done) {
+                    configure({
+                        responses: {
+                            passwordResetEmailSent: function(email, res) {
+                                res.send(200, 'Custom response after password reset email sent to: ' + email);
+                            }
+                        }
+                    });
+
+                    var unknownEmail = 'unknown_email@example.com';
+
+                    request(app)
+                        .post('/forgotpassword')
+                        .send({ email: unknownEmail })
+                        .expect(200, 'Custom response after password reset email sent to: unknown_email@example.com')
+                        .end(done);
+                });
+            });
         });
 
         describe('Step 2 - Visiting Reset URL', function() {
@@ -579,34 +581,6 @@ describe('Registration', function() {
                 });
             });
 
-            it('can render custom bad password reset token page', function(done) {
-                configure({
-                    responses: {
-                        badPasswordResetTokenResponse: function(res) {
-                            res.send(400, 'Custom bad token response');
-                        }
-                    }
-                });
-
-                registerUser(existingUserEmail, existingUserPassword, function(err) {
-                    if (err) {
-                        return done(err);
-                    }
-                    requestPasswordReset(existingUserEmail, function (err) {
-                        if (err) {
-                            return done(err);
-                        }
-
-                        var expiredToken = setupExpiredPasswordResetToken();
-
-                        request(app)
-                            .get('/forgotpassword/callback?token=' + expiredToken)
-                            .expect(400, 'Custom bad token response')
-                            .end(done);
-                    });
-                });
-            });
-
             it('renders password reset response if password reset token is valid', function(done) {
                 configure();
 
@@ -630,31 +604,62 @@ describe('Registration', function() {
                 });
             });
 
-            it('can render custom password reset page', function(done) {
-                configure({
-                    responses: {
-                        resetPasswordPage: function(res) {
-                            res.send(200, 'Custom update password response');
-                        }
-                    }
-                });
+            describe('Custom Responses', function() {
 
-                registerUser(existingUserEmail, existingUserPassword, function(err) {
-                    if (err) {
-                        return done(err);
-                    }
-                    requestPasswordReset(existingUserEmail, function (err) {
+                it('can render custom bad password reset token page', function(done) {
+                    configure({
+                        responses: {
+                            badPasswordResetTokenResponse: function(res) {
+                                res.send(400, 'Custom bad token response');
+                            }
+                        }
+                    });
+
+                    registerUser(existingUserEmail, existingUserPassword, function(err) {
                         if (err) {
                             return done(err);
                         }
+                        requestPasswordReset(existingUserEmail, function (err) {
+                            if (err) {
+                                return done(err);
+                            }
 
-                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
-                        var token = passwordResetTokenStore.tokens[0].token;
+                            var expiredToken = setupExpiredPasswordResetToken();
 
-                        request(app)
-                            .get('/forgotpassword/callback?token=' + token)
-                            .expect(200, 'Custom update password response')
-                            .end(done);
+                            request(app)
+                                .get('/forgotpassword/callback?token=' + expiredToken)
+                                .expect(400, 'Custom bad token response')
+                                .end(done);
+                        });
+                    });
+                });
+
+                it('can render custom password reset page', function(done) {
+                    configure({
+                        responses: {
+                            resetPasswordPage: function(res) {
+                                res.send(200, 'Custom update password response');
+                            }
+                        }
+                    });
+
+                    registerUser(existingUserEmail, existingUserPassword, function(err) {
+                        if (err) {
+                            return done(err);
+                        }
+                        requestPasswordReset(existingUserEmail, function (err) {
+                            if (err) {
+                                return done(err);
+                            }
+
+                            assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                            var token = passwordResetTokenStore.tokens[0].token;
+
+                            request(app)
+                                .get('/forgotpassword/callback?token=' + token)
+                                .expect(200, 'Custom update password response')
+                                .end(done);
+                        });
                     });
                 });
             });

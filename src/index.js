@@ -48,7 +48,7 @@ module.exports = function(options) {
             passwordResetEmailSent: function(email, res) {
                 res.send(200, 'Password reset email sent to: ' + email);
             },
-            passwordResetCallbackValidationErrors: validationErrorsRespose,
+            passwordResetPageValidationErrors: validationErrorsRespose,
             passwordResetPageInvalidToken: invalidTokenRespose,
             changePasswordInvalidToken: invalidTokenRespose,
             passwordResetPage: function(token, res) {
@@ -200,7 +200,7 @@ module.exports = function(options) {
             router.get('/changepassword', function(req, res, next) {
 
                 req.checkQuery('token', 'Password reset token required').notEmpty();
-                if (returnValidationErrors(req, res, responses.passwordResetCallbackValidationErrors)) {
+                if (returnValidationErrors(req, res, responses.passwordResetPageValidationErrors)) {
                     return;
                 }
 
@@ -310,7 +310,6 @@ module.exports = function(options) {
             var validationErrors = req.validationErrors(true);
             if (validationErrors) {
                 responseGenerator(validationErrors, req, res);
-                // responses.passwordResetCallbackValidationErrors(validationErrors, req, res);
                 return true;
             }
         }

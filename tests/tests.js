@@ -609,7 +609,7 @@ describe('Registration', function() {
                 it('can render custom invalid token page', function(done) {
                     configure({
                         responses: {
-                            passwordResetCallbackInvalidToken: function(res) {
+                            passwordResetPageInvalidToken: function(res) {
                                 res.send(400, 'Custom invalid token response');
                             }
                         }
@@ -862,7 +862,7 @@ describe('Registration', function() {
                 it('can return custom invalid token page when visiting callback', function(done) {
                     configure({
                         responses: {
-                            passwordResetCallbackInvalidToken: function(res) {
+                            passwordResetPageInvalidToken: function(res) {
                                 res.send(400, 'Custom invalid token response');
                             }
                         }

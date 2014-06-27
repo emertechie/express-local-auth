@@ -49,7 +49,7 @@ module.exports = function(options) {
                 res.send(200, 'Password reset email sent to: ' + email);
             },
             passwordResetCallbackValidationErrors: validationErrorsRespose,
-            passwordResetCallbackInvalidToken: invalidTokenRespose,
+            passwordResetPageInvalidToken: invalidTokenRespose,
             changePasswordInvalidToken: invalidTokenRespose,
             passwordResetPage: function(token, res) {
                 res.json(200, { token: token });
@@ -213,7 +213,7 @@ module.exports = function(options) {
                     if (isValid) {
                         responses.passwordResetPage(token, res);
                     } else {
-                        responses.passwordResetCallbackInvalidToken(res);
+                        responses.passwordResetPageInvalidToken(res);
                     }
                 });
             });

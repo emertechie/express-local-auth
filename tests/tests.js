@@ -545,7 +545,7 @@ describe('Registration', function() {
             it('ensures token is required', function(done) {
                 configure();
                 request(app)
-                    .get('/forgotpassword/callback?token=')
+                    .get('/changepassword?token=')
                     .expect(400, '{"token":{"param":"token","msg":"Password reset token required","value":""}}')
                     .end(done);
             });
@@ -553,7 +553,7 @@ describe('Registration', function() {
             it('ensures invalid password request tokens are ignored', function(done) {
                 configure();
                 request(app)
-                    .get('/forgotpassword/callback?token=unknown')
+                    .get('/changepassword?token=unknown')
                     .expect(400, 'Unknown or expired token')
                     .end(done);
             });
@@ -573,7 +573,7 @@ describe('Registration', function() {
                         var expiredToken = setupExpiredPasswordResetToken();
 
                         request(app)
-                            .get('/forgotpassword/callback?token=' + expiredToken)
+                            .get('/changepassword?token=' + expiredToken)
                             .expect(400, 'Unknown or expired token')
                             .end(done);
                     });
@@ -596,7 +596,7 @@ describe('Registration', function() {
                         var token = passwordResetTokenStore.tokens[0].token;
 
                         request(app)
-                            .get('/forgotpassword/callback?token=' + token)
+                            .get('/changepassword?token=' + token)
                             // obviously using
                             .expect(200, '{"token":"' + token + '"}')
                             .end(done);
@@ -627,7 +627,7 @@ describe('Registration', function() {
                             var expiredToken = setupExpiredPasswordResetToken();
 
                             request(app)
-                                .get('/forgotpassword/callback?token=' + expiredToken)
+                                .get('/changepassword?token=' + expiredToken)
                                 .expect(400, 'Custom invalid token response')
                                 .end(done);
                         });
@@ -656,7 +656,7 @@ describe('Registration', function() {
                             var token = passwordResetTokenStore.tokens[0].token;
 
                             request(app)
-                                .get('/forgotpassword/callback?token=' + token)
+                                .get('/changepassword?token=' + token)
                                 .expect(200, 'Custom update password response with token: ' + token)
                                 .end(done);
                         });
@@ -880,7 +880,7 @@ describe('Registration', function() {
                             var expiredToken = setupExpiredPasswordResetToken();
 
                             request(app)
-                                .get('/forgotpassword/callback?token=' + expiredToken)
+                                .get('/changepassword?token=' + expiredToken)
                                 .expect(400, 'Custom invalid token response')
                                 .end(done);
                         });

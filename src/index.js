@@ -197,7 +197,7 @@ module.exports = function(options) {
                 });
             });
 
-            router.get('/forgotpassword/callback', function(req, res, next) {
+            router.get('/changepassword', function(req, res, next) {
 
                 req.checkQuery('token', 'Password reset token required').notEmpty();
                 if (returnValidationErrors(req, res, responses.passwordResetCallbackValidationErrors)) {

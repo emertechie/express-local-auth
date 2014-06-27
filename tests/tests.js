@@ -541,14 +541,137 @@ describe('Registration', function() {
 
         describe('Step 2 - Visiting Reset URL', function() {
 
-            xit('ensures invalid password request tokens are ignored', function(done) {
-                // todo
+            it('ensures token is required', function(done) {
+                configure();
+                request(app)
+                    .get('/forgotpassword/callback?token=')
+                    .expect(400, '{"token":{"param":"token","msg":"Password reset token required","value":""}}')
+                    .end(done);
             });
 
-            xit('ensures that password reset request is only valid for limited period of time', function(done) {
-                // todo
-                // maybe set up PasswordResetTokenStore with a predefined record with a timestamp < now and test it fails
+            it('ensures invalid password request tokens are ignored', function(done) {
+                configure();
+                request(app)
+                    .get('/forgotpassword/callback?token=unknown')
+                    .expect(400, 'Unknown or expired token')
+                    .end(done);
             });
+
+            it('ensures that password reset request is only valid for limited period of time', function(done) {
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        var expiredToken = setupExpiredPasswordResetToken();
+
+                        request(app)
+                            .get('/forgotpassword/callback?token=' + expiredToken)
+                            .expect(400, 'Unknown or expired token')
+                            .end(done);
+                    });
+                });
+            });
+
+            it('can render custom bad password reset token page', function(done) {
+                configure({
+                    responses: {
+                        badPasswordResetTokenResponse: function(res) {
+                            res.send(400, 'Custom bad token response');
+                        }
+                    }
+                });
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        var expiredToken = setupExpiredPasswordResetToken();
+
+                        request(app)
+                            .get('/forgotpassword/callback?token=' + expiredToken)
+                            .expect(400, 'Custom bad token response')
+                            .end(done);
+                    });
+                });
+            });
+
+            it('renders password reset response if password reset token is valid', function(done) {
+                configure();
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                        var token = passwordResetTokenStore.tokens[0].token;
+
+                        request(app)
+                            .get('/forgotpassword/callback?token=' + token)
+                            .expect(200, 'Update password')
+                            .end(done);
+                    });
+                });
+            });
+
+            it('can render custom password reset page', function(done) {
+                configure({
+                    responses: {
+                        resetPasswordPage: function(res) {
+                            res.send(200, 'Custom update password response');
+                        }
+                    }
+                });
+
+                registerUser(existingUserEmail, existingUserPassword, function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+                    requestPasswordReset(existingUserEmail, function (err) {
+                        if (err) {
+                            return done(err);
+                        }
+
+                        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                        var token = passwordResetTokenStore.tokens[0].token;
+
+                        request(app)
+                            .get('/forgotpassword/callback?token=' + token)
+                            .expect(200, 'Custom update password response')
+                            .end(done);
+                    });
+                });
+            });
+
+            function setupExpiredPasswordResetToken() {
+
+                // Make sure only 1 token in store and that it looks legit
+                assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                var tokenObj = passwordResetTokenStore.tokens[0];
+                assert.isNotNull(tokenObj.expiry);
+                assert.typeOf(tokenObj.expiry, 'date');
+
+                // expire token:
+                tokenObj.expiry = new Date(Date.now() - 1);
+
+                return tokenObj.token;
+            }
         });
 
         describe('Step 3 - Changing Password', function() {

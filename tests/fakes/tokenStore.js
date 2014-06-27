@@ -20,14 +20,16 @@ FakeTokenStore.prototype.removeByEmail = function(email, callback) {
 };
 
 FakeTokenStore.prototype.findByToken = function(token, callback) {
-    var found = _.find(this.tokens, function(token) {
-        return token.token === token;
+    var found = _.find(this.tokens, function(tokenDetails) {
+        return tokenDetails.token === token;
     });
     callback(null, found);
 };
 
-function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
+function clone(tokenDetails) {
+    var parsed = JSON.parse(JSON.stringify(tokenDetails));
+    parsed.expiry = new Date(parsed.expiry);
+    return parsed;
 }
 
 module.exports = FakeTokenStore;

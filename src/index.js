@@ -38,6 +38,15 @@ module.exports = function(options) {
             },
             passwordResetEmailSent: function(email, res) {
                 res.send(200, 'Password reset email sent to: ' + email);
+            },
+            passwordResetCallbackValidationErrors:  function(validationErrors, req, res) {
+                res.json(400, validationErrors);
+            },
+            badPasswordResetTokenResponse: function(res) {
+                res.send(400, 'Unknown or expired token');
+            },
+            resetPasswordPage: function(res) {
+                res.send(200, 'Update password');
             }
         });
 
@@ -149,6 +158,35 @@ module.exports = function(options) {
                             }
                             responses.passwordResetEmailSent(email, res);
                         });
+                    }
+                });
+            });
+
+            router.get('/forgotpassword/callback', function(req, res, next) {
+
+                req.checkQuery('token', 'Password reset token required').notEmpty();
+                var validationErrors = req.validationErrors(true);
+                if (validationErrors) {
+                    return responses.passwordResetCallbackValidationErrors(validationErrors, req, res);
+                }
+
+                var token = req.query.token;
+
+                passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
+                    if (err) {
+                        return next(err);
+                    }
+
+                    var isValid =
+                        tokenDetails &&
+                        tokenDetails.expiry &&
+                        tokenDetails.expiry instanceof Date &&
+                        tokenDetails.expiry.getTime() >= Date.now();
+
+                    if (isValid) {
+                        responses.resetPasswordPage(res);
+                    } else {
+                        responses.badPasswordResetTokenResponse(res);
                     }
                 });
             });

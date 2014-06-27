@@ -71,7 +71,7 @@ module.exports = function(options) {
             router.use(bodyParser());
             router.use(expressValidator());
 
-            router.post('/register', function (req, res) {
+            router.post('/register', function (req, res, next) {
 
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                 req.checkBody('password', 'Password required').notEmpty();
@@ -86,12 +86,38 @@ module.exports = function(options) {
                     password: req.param('password')
                 };
 
-                register(req, userDetails, function (err, user) {
+                authService.hashPassword(userDetails.password, function(err, hashedPassword) {
                     if (err) {
-                        return res.send(err.statusCode || 500, err.message ? err.message : err);
+                        logger.error('Error hashing password while registering user', err);
+                        return next(err);
                     }
 
-                    responses.registered(user, res);
+                    delete userDetails.password; // Make sure no possibility of storing unhashed password
+                    userDetails.hashedPassword = hashedPassword;
+
+                    userStore.add(userDetails, function (err, user) {
+                        if (err) {
+                            return nexxt(err);
+                        }
+
+                        var userId = userIdGetter(user);
+
+                        emailService.sendRegistrationEmail(user, function(err) {
+                            if (err) {
+                                // log error but don't return it
+                                logger.error('Error sending registration email for user ' + userId, err);
+                            }
+
+                            authService.markLoggedInAfterAuthentication(req, user, function(err) {
+                                if (err) {
+                                    logger.error('Could not log in user ' + userId + ' after registration', err);
+                                    return next(err);
+                                }
+
+                                responses.registered(user, res);
+                            });
+                        });
+                    });
                 });
             });
 
@@ -252,7 +278,6 @@ module.exports = function(options) {
                             });
                         });
                     } else {
-                        // todo: test for changePasswordInvalidToken
                         responses.changePasswordInvalidToken(res);
                     }
                 });
@@ -288,56 +313,6 @@ module.exports = function(options) {
                 // responses.passwordResetCallbackValidationErrors(validationErrors, req, res);
                 return true;
             }
-        }
-
-        function makeError(statusCodeOrError, message) {
-            if (arguments.length === 1) {
-                message = arguments[0];
-                statusCodeOrError = 500;
-            }
-            return {
-                statusCode: statusCodeOrError,
-                message: message
-            };
-        }
-
-        function register(req, userDetails, callback) {
-            if (!userDetails.email || !userDetails.password) {
-                return callback(makeError(400, 'Must provide email & password'));
-            }
-
-            authService.hashPassword(userDetails.password, function(err, hashedPassword) {
-                if (err) {
-                    errorHandler('Error hashing password', err);
-                    return callback(makeError(500, 'Could not register user'));
-                }
-
-                delete userDetails.password; // Make sure no possibility of storing unhashed password
-                userDetails.hashedPassword = hashedPassword;
-
-                userStore.add(userDetails, function (err, user) {
-                    if (err) {
-                        return callback(makeError(err));
-                    }
-
-                    var userId = userIdGetter(user);
-
-                    emailService.sendRegistrationEmail(user, function(err) {
-                        if (err) {
-                            // log error but don't return it
-                            logger.error('Error sending registration email for user ' + userId, err);
-                        }
-
-                        authService.markLoggedInAfterAuthentication(req, user, function(err) {
-                            if (err) {
-                                logger.error('Could not log in user ' + userId + ' after registration', err);
-                                return callback(makeError(500, err));
-                            }
-                            callback(null, user);
-                        });
-                    });
-                });
-            });
         }
     };
 };

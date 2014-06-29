@@ -5,10 +5,15 @@ function FakeUserStore() {
 }
 
 FakeUserStore.prototype.add = function(userDetails, callback) {
+    var userAlreadyExists = !!_findByEmailSync.call(this, userDetails.email);
+    if (userAlreadyExists) {
+        return callback(null, userAlreadyExists);
+    }
+
     var user = clone(userDetails);
     user.id = this.fakeUserId || ('User#' + (this.users.length + 1));
     this.users.push(user);
-    callback(null, user);
+    callback(null, userAlreadyExists, user);
 };
 
 FakeUserStore.prototype.get = function(userId, cb) {
@@ -39,11 +44,15 @@ FakeUserStore.prototype.remove = function(userId, callback) {
 };
 
 FakeUserStore.prototype.findByEmail = function(email, callback) {
-    var found = _.find(this.users, function(user) {
-        return user.email === email;
-    });
+    var found = _findByEmailSync.call(this, email);
     callback(null, found);
 };
+
+function _findByEmailSync(email) {
+    return _.find(this.users, function(user) {
+        return user.email === email;
+    });
+}
 
 function clone(obj) {
     return JSON.parse(JSON.stringify(obj));

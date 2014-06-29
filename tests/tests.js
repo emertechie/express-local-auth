@@ -44,7 +44,7 @@ describe('Registration', function() {
             sendRegistrationEmail: function(user, cb) {
                 cb(null);
             },
-            sendPasswordResetEmail: function(user, cb) {
+            sendPasswordResetEmail: function(user, token, cb) {
                 cb(null);
             },
             sendPasswordResetNotificationForUnregisteredEmail: function(email, cb) {
@@ -158,6 +158,24 @@ describe('Registration', function() {
                     });
                 })
                 .end(done);
+        });
+
+        it('should prevent same user registering more than once', function(done) {
+            configure();
+
+            assert.lengthOf(userStore.users, 0);
+
+            request(app)
+                .post('/register')
+                .send({ email: 'foo@example.com', password: 'bar'})
+                .expect(201)
+                .end(function() {
+                    request(app)
+                        .post('/register')
+                        .send({ email: 'foo@example.com', password: 'bar'})
+                        .expect(400, 'Registration details already in use')
+                        .end(done);
+                });
         });
 
         // tested indirectly above, but want to make it more explicit

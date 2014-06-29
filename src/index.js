@@ -40,6 +40,10 @@ module.exports = function(options) {
                 var userId = userIdGetter(user);
                 res.send(201, JSON.stringify(userId));
             },
+            // todo: test
+            duplicateUserRegistration: function(req, res) {
+                res.send(400, 'Registration details already in use');
+            },
             registrationValidationErrors: validationErrorsRespose,
             unregistered: function(res) {
                 res.send(200);
@@ -95,9 +99,12 @@ module.exports = function(options) {
                     delete userDetails.password; // Make sure no possibility of storing unhashed password
                     userDetails.hashedPassword = hashedPassword;
 
-                    userStore.add(userDetails, function (err, user) {
+                    userStore.add(userDetails, function(err, userAlreadyExists, user) {
                         if (err) {
-                            return nexxt(err);
+                            return next(err);
+                        }
+                        if (userAlreadyExists) {
+                            return responses.duplicateUserRegistration(req, res);
                         }
 
                         var userId = userIdGetter(user);

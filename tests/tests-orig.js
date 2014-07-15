@@ -7,7 +7,7 @@ var assert = require('chai').assert,
     sinon = require('sinon'),
     registration = require('../src/index');
 
-describe('Registration', function() {
+xdescribe('Registration', function() {
 
     var app, userStore, passwordResetTokenStore, authService, emailService, config, configure;
 
@@ -69,7 +69,7 @@ describe('Registration', function() {
         };
     });
 
-    describe('User Registration', function() {
+    describe('User Registration (Old)', function() {
 
         var loggedInUserId, simlulatedLogInErr, userDetailsSeenForRegEmail;
 

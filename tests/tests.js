@@ -37,10 +37,14 @@ describe('Registration', function() {
         };
 
         fakeAuthService = {
+            loginPath: '/login',
             hashPassword: function(password, cb) {
                 cb(null, 'hashed-' + password);
             },
             markLoggedInAfterAuthentication: function(req, user, cb) {
+                cb(null);
+            },
+            logOut: function(req, user, cb) {
                 cb(null);
             }
         };
@@ -92,6 +96,9 @@ describe('Registration', function() {
         configureStandardRoutes = function(app) {
             app.post('/register', sentry.register(), function(req, res) {
                 res.send(201);
+            });
+            app.post('/unregister', sentry.unregister(), function(req, res) {
+                res.send(200, 'unregistered');
             });
         };
 
@@ -297,4 +304,97 @@ describe('Registration', function() {
                 });
         }
     });
+
+    describe('User Unregistration', function() {
+
+        var email, password;
+
+        beforeEach(function() {
+            configureApp();
+
+            email = 'foo@example.com';
+            password = 'bar';
+        });
+
+        it('should log existing user out when unregistering', function(done) {
+            setUpExistingUser(email, password, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                var mock = sinon.mock(fakeAuthService);
+                mock.expects("logOut").once().yields(null);
+
+                request(app)
+                    .post('/unregister')
+                    .expect(200, 'unregistered')
+                    .expect(function() {
+                        mock.verify();
+                    })
+                    .end(done);
+            });
+        });
+
+        it('should remove existing user from userStore when unregistering', function(done) {
+            setUpExistingUser(email, password, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                assert.lengthOf(userStore.users, 1);
+
+                request(app)
+                    .post('/unregister')
+                    .expect(200, 'unregistered')
+                    .expect(function() {
+                        assert.lengthOf(userStore.users, 0);
+                    })
+                    .end(done);
+            });
+        });
+
+        it('should redirect unknown user to login page when unregistering', function(done) {
+            fakeAuthService.isAuthenticated = function(req, cb) {
+                var authenticatedUser = false;
+                cb(null, authenticatedUser);
+            };
+
+            request(app)
+                .post('/unregister')
+                .expect(302)
+                .expect('location', '/login')
+                .end(done);
+        });
+
+        function setUpExistingUser(email, password, cb) {
+
+            // Set up registered user
+            registerUser(email, password, function(err) {
+                if (err) {
+                    return cb(err);
+                }
+
+                // Set up auth service to authenticate user:
+                fakeAuthService.isAuthenticated = function(req, cb) {
+                    var authenticatedUser = {
+                        id: userStore.users[0].id,
+                        email: email,
+                        username: email,
+                        password: password
+                    };
+                    cb(null, authenticatedUser);
+                };
+
+                cb();
+            });
+        }
+    });
+
+    function registerUser(email, password, cb) {
+        request(app)
+            .post('/register')
+            .send({ email: email, password: password})
+            .expect(201)
+            .end(cb);
+    }
 });

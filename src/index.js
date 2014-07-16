@@ -5,7 +5,6 @@ var express = require('express'),
 module.exports = function(options) {
 
     options = _.defaults(options || {}, {
-        registerPath: '/register',
         registerView: 'register',
         useSession: true
     });
@@ -105,6 +104,34 @@ module.exports = function(options) {
                                     });
                                 });
                             });
+                        });
+                    }
+                },
+                unregister: function() {
+                    return function unregisterHandler(req, res, next) {
+                        authService.isAuthenticated(req, function (err, authenticatedUser) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            if (authenticatedUser) {
+                                authService.logOut(req, authenticatedUser, function (err) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+
+                                    var userId = config.userIdGetter(authenticatedUser);
+                                    userStore.remove(userId, function (err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+
+                                        next();
+                                    });
+                                });
+                            } else {
+                                res.redirect(authService.loginPath);
+                            }
                         });
                     }
                 }

@@ -1,96 +1,25 @@
 var assert = require('chai').assert,
-    express = require('express'),
-    session = require('express-session'),
-    flash = require('connect-flash'),
-    bodyParser = require('body-parser'),
-    cookieParser = require('cookie-parser'),
     request = require('supertest'),
     FakeUserStore = require('./fakes/userStore'),
     FakeTokenStore = require('./fakes/tokenStore'),
+    fakeEmailService = require('./fakes/fakeEmailService'),
+    fakeAuthService = require('./fakes/fakeAuthService'),
+    utils = require('./utils'),
     _ = require('lodash'),
     sinon = require('sinon'),
-    registration = require('../src/index'),
     sentry = require('sentry');
 
 describe('Registration', function() {
 
-    var app, userStore, passwordResetTokenStore, fakeEmailService, fakeAuthService;
-    var configureApp, configureExpress, configureSentry, configureStandardRoutes;
+    var app, userStore, passwordResetTokenStore;
+    var configureApp, configureSentry, configureStandardRoutes;
 
     beforeEach(function() {
         userStore = new FakeUserStore();
         passwordResetTokenStore = new FakeTokenStore();
 
-        fakeEmailService = {
-            sendRegistrationEmail: function(user, cb) {
-                cb(null);
-            },
-            sendPasswordResetEmail: function(user, token, cb) {
-                cb(null);
-            },
-            sendPasswordResetNotificationForUnregisteredEmail: function(email, cb) {
-                cb(null);
-            },
-            sendPasswordChangedEmail: function(user, cb) {
-                cb(null);
-            }
-        };
-
-        fakeAuthService = {
-            loginPath: '/login',
-            hashPassword: function(password, cb) {
-                cb(null, 'hashed-' + password);
-            },
-            markLoggedInAfterAuthentication: function(req, user, cb) {
-                cb(null);
-            },
-            logOut: function(req, user, cb) {
-                cb(null);
-            }
-        };
-
-        configureExpress = function(options) {
-            options = options || {
-                useSession: true
-            };
-
-            var app = express();
-            app.use(express.static(__dirname + '/public'));
-            app.set('views', __dirname + '/views');
-            app.set('view engine', 'jade');
-            app.use(bodyParser.json());
-
-            if (options.useSession) {
-                app.use(cookieParser());
-                // Note: In a real app running with HTTPS, you should use following to limit cookie access:
-                // session({..., cookie: { httpOnly: true, secure: true } })
-                app.use(session({ secret: 'keyboard cat', resave: false, saveUninitialized: false } ));
-                app.use(flash());
-            }
-
-            app.use(function(err, req, res, next) {
-                console.error(err);
-                res.send(500, err);
-            });
-
-            return app;
-        };
-
         configureSentry = function(app, options) {
-            options = options || {};
-
-            var sentryOptions = _.defaults(options.sentry || {}, {
-                userStore: userStore,
-                emailService: fakeEmailService,
-                auth: function() {
-                    return {
-                        service: fakeAuthService,
-                        routeHandlers: {}
-                    }
-                },
-                registration: registration(options.registration)
-            });
-            sentry.initialize(app, sentryOptions);
+            utils.configureSentry(app, userStore, fakeEmailService, fakeAuthService, options);
         };
 
         configureStandardRoutes = function(app) {
@@ -104,7 +33,7 @@ describe('Registration', function() {
 
         configureApp = function(options) {
             options = options || {};
-            app = configureExpress();
+            app = utils.configureExpress();
             configureSentry(app, options);
             configureStandardRoutes(app);
             return app;
@@ -116,7 +45,7 @@ describe('Registration', function() {
         var registerValidationErrors, registerError;
 
         beforeEach(function() {
-            app = configureExpress();
+            app = utils.configureExpress();
             configureSentry(app);
 
             app.post('/register', sentry.register(), function(req, res) {

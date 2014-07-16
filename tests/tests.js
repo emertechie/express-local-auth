@@ -11,15 +11,14 @@ var assert = require('chai').assert,
 
 describe('Registration', function() {
 
-    var app, userStore, passwordResetTokenStore;
+    var app, userStore;
     var configureApp, configureSentry, configureStandardRoutes;
 
     beforeEach(function() {
         userStore = new FakeUserStore();
-        passwordResetTokenStore = new FakeTokenStore();
 
         configureSentry = function(app, options) {
-            utils.configureSentry(app, userStore, fakeEmailService, fakeAuthService, options);
+            utils.configureSentry(app, userStore, new TokenStore(), fakeEmailService, fakeAuthService, options);
         };
 
         configureStandardRoutes = function(app) {

@@ -1,6 +1,8 @@
 var express = require('express'),
     expressValidator = require('express-validator'),
-    _ = require('lodash');
+    _ = require('lodash'),
+    uuid = require('node-uuid'),
+    async = require('async');
 
 module.exports = function(options) {
 
@@ -17,32 +19,22 @@ module.exports = function(options) {
             throw new Error('Required configuration parameter missing');
         }
         if (!config.userStore) {
-            throw new Error('Missing required userStore service');
+            throw new Error('Missing required userStore config');
+        }
+        if (!config.passwordResetTokenStore) {
+            throw new Error('Missing required passwordResetTokenStore config');
         }
         if (!config.emailService) {
-            throw new Error('Missing required email service');
+            throw new Error('Missing required emailService config');
         }
         var userStore = config.userStore;
+        var passwordResetTokenStore = config.passwordResetTokenStore;
         var emailService = config.emailService;
 
-        /*var authService = buildAuthService(userStore, config);
-        configurePassport(userStore, config, authService);
-
-        router.use(passport.initialize());
         router.use(expressValidator());
-        if (options.useSession) {
-            router.use(passport.session());
-        }*/
-
-        router.use(expressValidator());
-
-        /*if (options.useSession) {
-            router.use(passport.session());
-        }*/
 
         return {
             routeHandlers: buildRouteHandlers(authService, userStore, emailService)
-            // service: authService
         };
 
         function buildRouteHandlers(authService, userStore, emailService) {
@@ -134,6 +126,60 @@ module.exports = function(options) {
                             }
                         });
                     }
+                },
+                forgotPassword: function(routeOptions) {
+                    var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
+
+                    return function forgotPasswordHandler(req, res, next) {
+                        req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
+                        if (anyValidationErrors(req, res, next, errorRedirect)) {
+                            return;
+                        }
+
+                        var email = req.body.email;
+
+                        userStore.findByEmail(email, function(err, user) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            // Note: setting this in case next handler needs to know if user found
+                            res.locals.user = user;
+
+                            if (user) {
+                                var tokenObj = {
+                                    email: email,
+                                    userId: config.userIdGetter(user),
+                                    token: uuid.v4(),
+                                    expiry: new Date(Date.now() + (options.tokenExpirationMins * 60 * 1000))
+                                };
+
+                                async.waterfall([
+                                    function(callback) {
+                                        passwordResetTokenStore.removeAllByEmail(email, callback);
+                                    },
+                                    function(callback) {
+                                        passwordResetTokenStore.add(tokenObj, callback);
+                                    },
+                                    function(addedToken, callback) {
+                                        emailService.sendPasswordResetEmail(user, tokenObj.token, callback);
+                                    }
+                                ], function(err) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+                                    next();
+                                });
+                            } else {
+                                emailService.sendPasswordResetNotificationForUnregisteredEmail(email, function(err) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+                                    next();
+                                });
+                            }
+                        });
+                    };
                 }
             };
 

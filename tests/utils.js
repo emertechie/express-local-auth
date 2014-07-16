@@ -34,11 +34,12 @@ module.exports = {
 
         return app;
     },
-    configureSentry: function(app, userStore, emailService, authService, options) {
+    configureSentry: function(app, userStore, passwordResetTokenStore, emailService, authService, options) {
         options = options || {};
 
         var sentryOptions = _.defaults(options.sentry || {}, {
             userStore: userStore,
+            passwordResetTokenStore: passwordResetTokenStore,
             emailService: emailService,
             auth: function() {
                 return {

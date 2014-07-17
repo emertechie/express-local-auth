@@ -12,6 +12,11 @@ module.exports = function(options) {
         useSession: true
     });
 
+    expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
+        var valueToMatch = req.param(expectedMatchParam);
+        return str === valueToMatch;
+    });
+
     return function RegistrationComponentFactory(router, authService, config) {
         if (!router) {
             throw new Error('Required router parameter');
@@ -76,7 +81,7 @@ module.exports = function(options) {
                                     return next(err);
                                 }
                                 if (userAlreadyExists) {
-                                    return handleError('error', 'Registration details already in use', errorRedirect, req, res, next);
+                                    return handleError(req, res, next, 'error', 'Registration details already in use', errorRedirect);
                                 }
 
                                 var userId = config.userIdGetter(user);
@@ -193,8 +198,11 @@ module.exports = function(options) {
                         }
 
                         req.checkQuery('token', 'Password reset token required').notEmpty();
-                        if (anyValidationErrors(req, res, next, errorRedirect)) {
-                            return;
+                        var validationErrors = req.validationErrors(true);
+                        if (validationErrors) {
+                            // Note: Just putting validationErrors in locals since this is a GET request
+                            res.locals.validationErrors = validationErrors;
+                            return next();
                         }
 
                         var token = req.query.token;
@@ -203,11 +211,84 @@ module.exports = function(options) {
                             if (err) {
                                 return next(err);
                             }
-                            if (isValid) {
-                                next();
-                            } else {
-                                handleError('error', 'Unknown or expired token', errorRedirect, req, res, next);
+
+                            // Note: Just putting error in locals since this is a GET request
+                            if (!isValid) {
+                                res.locals.error = 'Unknown or expired token';
                             }
+
+                            next();
+                        });
+                    };
+                },
+                changePassword: function(routeOptions) {
+                    var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
+
+                    return function changePasswordHandler(req, res, next) {
+
+                        req.checkBody('token', 'Password reset token required').notEmpty();
+                        req.checkBody('password', 'New password required').notEmpty();
+                        req.checkBody('confirmPassword', 'Password confirmation required').notEmpty();
+
+                        var errorRedirectQueryParams = req.body.token ? '?token=' + req.body.token : '';
+
+                        if (anyValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                            return;
+                        }
+
+                        // Only check confirm password after we know others are ok to avoid returning a redundant error
+                        req.checkBody('confirmPassword', 'Password and confirm password do not match').matches('password', req);
+                        if (anyValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                            return;
+                        }
+
+                        var token = req.body.token;
+                        var password = req.body.password;
+
+                        findAndVerifyToken(token, function(err, isValid, tokenDetails) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            if (!isValid) {
+                                return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                            }
+
+                            authService.hashPassword(password, function(err, hashedPassword) {
+                                if (err) {
+                                    return next(err);
+                                }
+
+                                userStore.get(tokenDetails.userId, function(err, user) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+                                    if (!user) {
+                                        return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                                    }
+
+                                    user.hashedPassword = hashedPassword;
+
+                                    userStore.update(user, function(err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+
+                                        passwordResetTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
+                                            if (err) {
+                                                return next(err);
+                                            }
+
+                                            emailService.sendPasswordChangedEmail(user, function(err) {
+                                                if (err) {
+                                                    // TODO logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
+                                                }
+                                                next();
+                                            });
+                                        });
+                                    });
+                                });
+                            });
                         });
                     };
                 }
@@ -230,18 +311,18 @@ module.exports = function(options) {
                 });
             }
 
-            function anyValidationErrors(req, res, next, validationRedirect) {
+            function anyValidationErrors(req, res, next, validationRedirect, redirectQueryParams) {
                 var validationErrors = req.validationErrors(true);
                 if (validationErrors) {
-                    handleError('validationErrors', validationErrors, validationRedirect, req, res, next);
+                    handleError(req, res, next, 'validationErrors', validationErrors, validationRedirect, redirectQueryParams);
                     return true;
                 }
             }
 
-            function handleError(errorName, error, errorRedirect, req, res, next) {
+            function handleError(req, res, next, errorName, error, errorRedirect, redirectQueryParams) {
                 if (errorRedirect) {
                     req.flash(errorName, error);
-                    var redirectPath = getErrorRedirectPath(req, errorRedirect);
+                    var redirectPath = getErrorRedirectPath(req, errorRedirect, redirectQueryParams);
                     res.redirect(redirectPath);
                 } else {
                     res.locals[errorName] = error;
@@ -255,10 +336,12 @@ module.exports = function(options) {
                     : routeOptions.errorRedirect || useSession;
             }
 
-            function getErrorRedirectPath(req, errorRedirect) {
-                return (errorRedirect === true)
+            function getErrorRedirectPath(req, errorRedirect, redirectQueryParams) {
+                var path = (errorRedirect === true)
                     ? req.path // so, things like POST /register will redirect to GET /register with errors in flash
                     : errorRedirect;
+
+                return path + (redirectQueryParams || '');
             }
         }
     };

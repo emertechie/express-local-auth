@@ -53,22 +53,32 @@ module.exports = {
 
         sentry.initialize(app, sentryOptions);
     },
-    verifyPostRedirectGet: function(app, path, sendData, done, verifyAfterGetFn) {
+    verifyPostRedirectGet: function(app, path, sendData, redirectPath, done, verifyAfterGetFn) {
+        // Allow for optional redirectPath:
+        if (arguments.length === 5) {
+            verifyAfterGetFn = done;
+            done = redirectPath;
+            redirectPath = path;
+        }
+
         request(app)
             .post(path)
             .send(sendData)
             .expect(302)
-            .expect('location', path)
+            .expect('location', redirectPath)
             .end(function(err, res) {
                 if (err) {
                     return done(err);
                 }
+
+                var redirectPath = res.headers['location'];
+
                 request(app)
-                    .get(path)
+                    .get(redirectPath)
                     .set('cookie', res.headers['set-cookie'])
                     .expect(200)
-                    .expect(function() {
-                        verifyAfterGetFn();
+                    .expect(function(res) {
+                        verifyAfterGetFn(res);
                     })
                     .end(done);
             });

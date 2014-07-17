@@ -188,8 +188,6 @@ module.exports = function(options) {
                     };
                 },
                 changePasswordView: function(routeOptions) {
-                    var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
-
                     return function changePasswordViewHandler(req, res, next) {
                         var hasTokenParam = 'token' in req.query;
                         if (!hasTokenParam) {

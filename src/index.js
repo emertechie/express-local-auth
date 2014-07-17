@@ -8,6 +8,7 @@ module.exports = function(options) {
 
     options = _.defaults(options || {}, {
         registerView: 'register',
+        tokenExpirationMins: 60,
         useSession: true
     });
 
@@ -180,8 +181,54 @@ module.exports = function(options) {
                             }
                         });
                     };
+                },
+                changePasswordView: function(routeOptions) {
+                    var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
+
+                    return function changePasswordViewHandler(req, res, next) {
+                        var hasTokenParam = 'token' in req.query;
+                        if (!hasTokenParam) {
+                            // we've probably redirected to page on an error so just render view:
+                            return next();
+                        }
+
+                        req.checkQuery('token', 'Password reset token required').notEmpty();
+                        if (anyValidationErrors(req, res, next, errorRedirect)) {
+                            return;
+                        }
+
+                        var token = req.query.token;
+
+                        findAndVerifyToken(token, function(err, isValid) {
+                            if (err) {
+                                return next(err);
+                            }
+                            if (isValid) {
+                                next();
+                            } else {
+                                handleError('error', 'Unknown or expired token', errorRedirect, req, res, next);
+                            }
+                        });
+                    };
                 }
             };
+
+            function findAndVerifyToken(token, cb) {
+                passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    var isValid =
+                        tokenDetails &&
+                        tokenDetails.token &&
+                        tokenDetails.expiry &&
+                        tokenDetails.expiry instanceof Date &&
+                        tokenDetails.expiry.getTime() >= Date.now();
+
+                    cb(null, isValid, tokenDetails);
+                });
+            }
 
             function anyValidationErrors(req, res, next, validationRedirect) {
                 var validationErrors = req.validationErrors(true);

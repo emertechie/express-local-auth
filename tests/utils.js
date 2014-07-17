@@ -1,5 +1,6 @@
 var express = require('express'),
     session = require('express-session'),
+    request = require('supertest'),
     flash = require('connect-flash'),
     bodyParser = require('body-parser'),
     cookieParser = require('cookie-parser'),
@@ -51,5 +52,25 @@ module.exports = {
         });
 
         sentry.initialize(app, sentryOptions);
+    },
+    verifyPostRedirectGet: function(app, path, sendData, done, verifyAfterGetFn) {
+        request(app)
+            .post(path)
+            .send(sendData)
+            .expect(302)
+            .expect('location', path)
+            .end(function(err, res) {
+                if (err) {
+                    return done(err);
+                }
+                request(app)
+                    .get(path)
+                    .set('cookie', res.headers['set-cookie'])
+                    .expect(200)
+                    .expect(function() {
+                        verifyAfterGetFn();
+                    })
+                    .end(done);
+            });
     }
 };

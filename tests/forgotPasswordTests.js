@@ -44,7 +44,7 @@ describe('Forgot Password', function() {
         };
     });
 
-    describe.only('Step 1 - Requesting Reset', function() {
+    describe('Step 1 - Requesting Reset', function() {
 
         var forgotPasswordValidationErrors;
 
@@ -64,7 +64,7 @@ describe('Forgot Password', function() {
         it('requires valid email', function(done) {
             var postData = { email: '' };
 
-            verifyPostRedirectGet('/forgotpassword', postData, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/forgotpassword', postData, done, function verifyAfterGet() {
                 assert.deepEqual(forgotPasswordValidationErrors, [{
                     email: {
                         param: 'email',
@@ -194,19 +194,101 @@ describe('Forgot Password', function() {
                 });
             });
         });
+    });
 
-        function verifyPostRedirectGet(path, sendData, done, verifyAfterGetFn) {
+    describe('Step 2 - Visiting Reset URL', function() {
+
+        var changePasswordValidationErrors, changePasswordError;
+
+        beforeEach(function() {
+            configureApp();
+
+            app.post('/forgotpassword', sentry.forgotPassword(), function(req, res) {
+                var email = req.body.email;
+                res.send(200, 'Password reset email sent to: ' + email);
+            });
+
+            app.get('/changepassword', sentry.changePasswordView(), function(req, res) {
+                changePasswordValidationErrors = req.session.flash ? req.session.flash.validationErrors : null;
+                changePasswordError = req.session.flash ? req.session.flash.error : null;
+                res.send(200, 'Dummy change password page with token: ' + req.query.token);
+            });
+        });
+
+        it('ensures token is required', function(done) {
+            var token = '';
+
+            verifyChangePasswordErrors(token, done, function() {
+                assert.deepEqual(changePasswordValidationErrors, [{
+                    token: {
+                        param: 'token',
+                        msg: 'Password reset token required',
+                        value: ''
+                    }
+                }]);
+            });
+        });
+
+        it('ensures invalid password request tokens are ignored', function(done) {
+            var token = 'unknown';
+
+            verifyChangePasswordErrors(token, done, function() {
+                assert.equal(changePasswordError, 'Unknown or expired token');
+            });
+        });
+
+        it('ensures that password reset request is only valid for limited period of time', function(done) {
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+                requestPasswordReset(existingUserEmail, function (err) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    var expiredToken = setupExpiredPasswordResetToken();
+
+                    verifyChangePasswordErrors(expiredToken, done, function() {
+                        assert.equal(changePasswordError, 'Unknown or expired token');
+                    });
+                });
+            });
+        });
+
+        it('renders password reset response if password reset token is valid', function(done) {
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+                requestPasswordReset(existingUserEmail, function (err) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                    var token = passwordResetTokenStore.tokens[0].token;
+                    assert.ok(token);
+
+                    request(app)
+                        .get('/changepassword?token=' + token)
+                        .expect(200, 'Dummy change password page with token: ' + token)
+                        .end(done);
+                });
+            });
+        });
+
+        function verifyChangePasswordErrors(token, done, verifyAfterGetFn) {
             request(app)
-                .post(path)
-                .send(sendData)
+                .get('/changepassword?token=' + token)
                 .expect(302)
-                .expect('location', path)
+                .expect('location', '/changepassword')
                 .end(function(err, res) {
                     if (err) {
                         return done(err);
                     }
                     request(app)
-                        .get(path)
+                        .get('/changepassword')
                         .set('cookie', res.headers['set-cookie'])
                         .expect(200)
                         .expect(function() {
@@ -216,6 +298,20 @@ describe('Forgot Password', function() {
                 });
         }
     });
+
+    function setupExpiredPasswordResetToken() {
+
+        // Make sure only 1 token in store and that it looks legit
+        assert.lengthOf(passwordResetTokenStore.tokens, 1);
+        var tokenObj = passwordResetTokenStore.tokens[0];
+        assert.isNotNull(tokenObj.expiry);
+        assert.typeOf(tokenObj.expiry, 'date');
+
+        // expire token:
+        tokenObj.expiry = new Date(Date.now() - 1);
+
+        return tokenObj.token;
+    }
 
     function registerUser(email, password, cb) {
         request(app)

@@ -18,7 +18,7 @@ describe('Registration', function() {
         userStore = new FakeUserStore();
 
         configureSentry = function(app, options) {
-            utils.configureSentry(app, userStore, new TokenStore(), fakeEmailService, fakeAuthService, options);
+            utils.configureSentry(app, userStore, new FakeTokenStore(), fakeEmailService, fakeAuthService, options);
         };
 
         configureStandardRoutes = function(app) {

@@ -1,5 +1,5 @@
 module.exports = {
-    sendRegistrationEmail: function(user, cb) {
+    sendRegistrationEmail: function(user, verifyEmailToken, cb) {
         cb(null);
     },
     sendPasswordResetEmail: function(user, token, cb) {

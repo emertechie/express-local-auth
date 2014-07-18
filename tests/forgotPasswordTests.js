@@ -23,7 +23,8 @@ describe('Forgot Password', function() {
         passwordResetTokenStore = new FakeTokenStore();
 
         configureSentry = function(app, options) {
-            utils.configureSentry(app, userStore, passwordResetTokenStore, fakeEmailService, fakeAuthService, options);
+            var verifyEmailTokenStore = new FakeTokenStore();
+            utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
         };
 
         configureStandardRoutes = function(app) {

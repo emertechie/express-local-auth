@@ -11,14 +11,17 @@ var assert = require('chai').assert,
 
 describe('Registration', function() {
 
-    var app, userStore;
+    var app, userStore, verifyEmailTokenStore;
     var configureApp, configureSentry, configureStandardRoutes;
 
     beforeEach(function() {
         userStore = new FakeUserStore();
 
         configureSentry = function(app, options) {
-            utils.configureSentry(app, userStore, new FakeTokenStore(), fakeEmailService, fakeAuthService, options);
+            var passwordResetTokenStore = new FakeTokenStore();
+            verifyEmailTokenStore = new FakeTokenStore();
+
+            utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
         };
 
         configureStandardRoutes = function(app) {
@@ -193,7 +196,7 @@ describe('Registration', function() {
             assert.lengthOf(userStore.users, 0);
 
             var userForRegEmail;
-            fakeEmailService.sendRegistrationEmail = function(userDetails, callback) {
+            fakeEmailService.sendRegistrationEmail = function(userDetails, verifyEmailToken, callback) {
                 userForRegEmail = _.clone(userDetails);
                 callback(null);
             };
@@ -229,6 +232,174 @@ describe('Registration', function() {
                             redirectVerifyFn();
                         })
                         .end(done);
+                });
+        }
+    });
+
+    describe('User Registration With Email Verification', function() {
+
+        var verifyEmailValidationErrors, verifyEmailError;
+
+        beforeEach(function() {
+            app = utils.configureExpress();
+            configureSentry(app, {
+                registration: {
+                    verifyEmail: true
+                }
+            });
+
+            app.post('/register', sentry.register(), function (req, res) {
+                // Should have redirected before here on errors
+                res.send(201);
+                // Normally something like: res.redirect('/home');
+            });
+
+            app.get('/verifyemail', sentry.verifyEmailView(), function(req, res) {
+                verifyEmailValidationErrors = res.locals.validationErrors;
+                verifyEmailError = res.locals.error;
+                res.send('dummy verify email page');
+            });
+        });
+
+        it('provides email address verification token when sending registration email', function(done) {
+            var userDetails, verifyEmailToken;
+            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
+                userDetails = _.clone(_userDetails);
+                verifyEmailToken = _verifyEmailToken;
+                callback(null);
+            };
+
+            request(app)
+                .post('/register')
+                .send({ email: 'user@example.com', username: 'user', password: 'bar'})
+                .expect(function() {
+                    // verify the user values are what we expect, for regex below
+                    assert.equal(userDetails.id, 'User#1');
+                    assert.equal(userDetails.email, 'user@example.com');
+                    assert.equal(userDetails.username, 'user');
+
+                    assert.ok(verifyEmailToken, 'Verify email token present');
+                    assert.isTrue(verifyEmailToken.length > 8, 'token of reasonable size');
+
+                    // matching 'user' covers user id, email and username
+                    var tokenContainsUserIdentifiers = (/user/gi).test(verifyEmailToken);
+                    assert.isFalse(tokenContainsUserIdentifiers, 'verify email token does not contain any user identifiers to prevent guessing')
+                })
+                .end(done);
+        });
+
+        it('registers user with emailVerified property set to false initially', function(done) {
+            var userDetails, verifyEmailToken;
+            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
+                userDetails = _.clone(_userDetails);
+                verifyEmailToken = _verifyEmailToken;
+                callback(null);
+            };
+
+            assert.lengthOf(userStore.users, 0);
+
+            request(app)
+                .post('/register')
+                .send({ email: 'anotheruser@example.com', username: 'user', password: 'bar'})
+                .expect(function() {
+                    assert.lengthOf(userStore.users, 1);
+                    assert.isFalse(userStore.users[0].emailVerified, 'emailVerified set to false');
+                })
+                .end(done);
+        });
+
+        it('requires token when verifying email', function(done) {
+            request(app)
+                .get('/verifyemail?token=')
+                .expect(400)
+                .expect(function() {
+                    assert.deepEqual(verifyEmailValidationErrors, {
+                        token: {
+                            param: 'token',
+                            msg: 'Verify email token required',
+                            value: ''
+                        }
+                    });
+                })
+                .end(done);
+        });
+
+        it('rejects attempt to verify email with invalid token', function(done) {
+            request(app)
+                .get('/verifyemail?token=unknown-token')
+                .expect(400)
+                .expect(function() {
+                    assert.equal(verifyEmailError, 'Unknown or invalid verify email token')
+                })
+                .end(done);
+        });
+
+        it('rejects attempt to verify email with token for unknown user', function(done) {
+            assert.lengthOf(userStore.users, 0);
+
+            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+
+                // Clear all users
+                userStore.users = [];
+
+                request(app)
+                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .expect(400)
+                    .expect(function() {
+                        assert.equal(verifyEmailError, 'Unknown or invalid token');
+                    })
+                    .end(done);
+            });
+        });
+
+        it('marks user email address verified given valid token', function(done) {
+            assert.lengthOf(userStore.users, 0);
+
+            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+                request(app)
+                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .expect(200)
+                    .expect(function() {
+                        assert.lengthOf(userStore.users, 1);
+                        assert.isTrue(userStore.users[0].emailVerified, 'Verified email');
+                    })
+                    .end(done);
+            });
+        });
+
+        it('removes email verification token after use', function(done) {
+            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+
+                assert.lengthOf(verifyEmailTokenStore.tokens, 1);
+
+                request(app)
+                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .expect(200)
+                    .expect(function() {
+                        assert.lengthOf(verifyEmailTokenStore.tokens, 0);
+                    })
+                    .end(done);
+            });
+        });
+
+        function registerUserAndCaptureToken(done, callback) {
+
+            var userDetails, verifyEmailToken;
+            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
+                userDetails = _.clone(_userDetails);
+                verifyEmailToken = _verifyEmailToken;
+                callback(null);
+            };
+
+            request(app)
+                .post('/register')
+                .send({ email: 'user@example.com', username: 'user', password: 'bar'})
+                .end(function(err) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    callback(verifyEmailToken, userDetails);
                 });
         }
     });

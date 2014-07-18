@@ -9,6 +9,7 @@ module.exports = function(options) {
     options = _.defaults(options || {}, {
         registerView: 'register',
         tokenExpirationMins: 60,
+        verifyEmail: false,
         useSession: true
     });
 
@@ -33,8 +34,12 @@ module.exports = function(options) {
         if (!config.emailService) {
             throw new Error('Missing required emailService config');
         }
+        if (options.verifyEmail && !config.verifyEmailTokenStore) {
+            throw new Error('Missing required verifyEmailTokenStore config');
+        }
         var userStore = config.userStore;
         var passwordResetTokenStore = config.passwordResetTokenStore;
+        var verifyEmailTokenStore = config.verifyEmailTokenStore;
         var emailService = config.emailService;
 
         router.use(expressValidator());
@@ -66,6 +71,9 @@ module.exports = function(options) {
                             username: req.param('username') || email,
                             password: req.param('password')
                         };
+                        if (options.verifyEmail) {
+                            userDetails.emailVerified = false;
+                        }
 
                         authService.hashPassword(userDetails.password, function(err, hashedPassword) {
                             if (err) {
@@ -84,26 +92,95 @@ module.exports = function(options) {
                                     return handleError(req, res, next, 'error', 'Registration details already in use', errorRedirect);
                                 }
 
-                                var userId = config.userIdGetter(user);
-
-                                emailService.sendRegistrationEmail(user, function(err) {
-                                    if (err) {
-                                        // log error but don't return it
-                                        // TODO logger.error('Error sending registration email for user ' + userId, err);
-                                    }
-
-                                    authService.markLoggedInAfterAuthentication(req, user, function(err) {
+                                var sendRegEmailAndLogIn = function(verifyEmailToken) {
+                                    emailService.sendRegistrationEmail(user, verifyEmailToken, function(err) {
                                         if (err) {
-                                            // TODO logger.error('Could not log in user ' + userId + ' after registration', err);
-                                            return next(err);
+                                            // log error but don't return it
+                                            // TODO logger.error('Error sending registration email for user ' + userId, err);
                                         }
 
-                                        next();
+                                        authService.markLoggedInAfterAuthentication(req, user, function(err) {
+                                            if (err) {
+                                                // TODO logger.error('Could not log in user ' + userId + ' after registration', err);
+                                                return next(err);
+                                            }
+                                            next();
+                                        });
                                     });
-                                });
+                                };
+
+                                if (options.verifyEmail) {
+                                    var tokenObj = {
+                                        email: email,
+                                        userId: config.userIdGetter(user),
+                                        token: uuid.v4()
+                                    };
+                                    verifyEmailTokenStore.add(tokenObj, function(err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+                                        sendRegEmailAndLogIn(tokenObj.token);
+                                    });
+                                } else {
+                                    sendRegEmailAndLogIn();
+                                }
                             });
                         });
                     }
+                },
+                verifyEmailView: function() {
+                    return function verifyEmailAddressHandler(req, res, next) {
+                        req.checkQuery('token', 'Verify email token required').notEmpty();
+                        var validationErrors = req.validationErrors(true);
+                        if (validationErrors) {
+                            res.status(400);
+                            res.locals.validationErrors = validationErrors;
+                            return next();
+                        }
+
+                        var token = req.query.token;
+
+                        verifyEmailTokenStore.findByToken(token, function(err, tokenDetails) {
+                            if (err) {
+                                return cb(err);
+                            }
+
+                            if (tokenDetails) {
+
+                                userStore.findByEmail(tokenDetails.email, function(err, user) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+
+                                    if (!user) {
+                                        res.status(400);
+                                        res.locals.error = 'Unknown or invalid token';
+                                        return next();
+                                    }
+
+                                    user.emailVerified = true;
+
+                                    userStore.update(user, function(err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+
+                                        verifyEmailTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
+                                            if (err) {
+                                                return next(err);
+                                            }
+
+                                            next();
+                                        });
+                                    });
+                                });
+                            } else {
+                                res.status(400);
+                                res.locals.error = 'Unknown or invalid verify email token';
+                                next();
+                            }
+                        });
+                    };
                 },
                 unregister: function() {
                     return function unregisterHandler(req, res, next) {
@@ -187,7 +264,7 @@ module.exports = function(options) {
                         });
                     };
                 },
-                changePasswordView: function(routeOptions) {
+                changePasswordView: function() {
                     return function changePasswordViewHandler(req, res, next) {
                         var hasTokenParam = 'token' in req.query;
                         if (!hasTokenParam) {
@@ -205,7 +282,7 @@ module.exports = function(options) {
 
                         var token = req.query.token;
 
-                        findAndVerifyToken(token, function(err, isValid) {
+                        findAndVerifyPasswordResetToken(token, function(err, isValid) {
                             if (err) {
                                 return next(err);
                             }
@@ -243,7 +320,7 @@ module.exports = function(options) {
                         var token = req.body.token;
                         var password = req.body.password;
 
-                        findAndVerifyToken(token, function(err, isValid, tokenDetails) {
+                        findAndVerifyPasswordResetToken(token, function(err, isValid, tokenDetails) {
                             if (err) {
                                 return next(err);
                             }
@@ -292,7 +369,7 @@ module.exports = function(options) {
                 }
             };
 
-            function findAndVerifyToken(token, cb) {
+            function findAndVerifyPasswordResetToken(token, cb) {
                 passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
                     if (err) {
                         return cb(err);

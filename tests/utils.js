@@ -54,7 +54,9 @@ module.exports = {
 
         sentry.initialize(app, sentryOptions);
     },
-    verifyPostRedirectGet: function(app, path, sendData, redirectPath, done, verifyAfterGetFn) {
+    verifyPostRedirectGet: function(app, path, sendData, redirectPath, done, verifyAfterGetFn, options) {
+        options = options || {};
+
         // Allow for optional redirectPath:
         if (arguments.length === 5) {
             verifyAfterGetFn = done;
@@ -77,7 +79,7 @@ module.exports = {
                 request(app)
                     .get(redirectPath)
                     .set('cookie', res.headers['set-cookie'])
-                    .expect(200)
+                    .expect(options.expectedGetStatus || 200)
                     .expect(function(res) {
                         verifyAfterGetFn(res);
                     })

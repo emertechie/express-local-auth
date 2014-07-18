@@ -61,7 +61,7 @@ module.exports = function(options) {
                     return function registerHandler(req, res, next) {
                         req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                         req.checkBody('password', 'Password required').notEmpty();
-                        if (anyValidationErrors(req, res, next, errorRedirect)) {
+                        if (handleValidationErrors(req, res, next, errorRedirect)) {
                             return;
                         }
 
@@ -215,7 +215,7 @@ module.exports = function(options) {
 
                     return function forgotPasswordHandler(req, res, next) {
                         req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
-                        if (anyValidationErrors(req, res, next, errorRedirect)) {
+                        if (handleValidationErrors(req, res, next, errorRedirect)) {
                             return;
                         }
 
@@ -275,7 +275,7 @@ module.exports = function(options) {
                         req.checkQuery('token', 'Password reset token required').notEmpty();
                         var validationErrors = req.validationErrors(true);
                         if (validationErrors) {
-                            // Note: Just putting validationErrors in locals since this is a GET request
+                            res.status(400);
                             res.locals.validationErrors = validationErrors;
                             return next();
                         }
@@ -287,8 +287,8 @@ module.exports = function(options) {
                                 return next(err);
                             }
 
-                            // Note: Just putting error in locals since this is a GET request
                             if (!isValid) {
+                                res.status(400);
                                 res.locals.error = 'Unknown or expired token';
                             }
 
@@ -307,13 +307,13 @@ module.exports = function(options) {
 
                         var errorRedirectQueryParams = req.body.token ? '?token=' + req.body.token : '';
 
-                        if (anyValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                        if (handleValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
                             return;
                         }
 
                         // Only check confirm password after we know others are ok to avoid returning a redundant error
                         req.checkBody('confirmPassword', 'Password and confirm password do not match').matches('password', req);
-                        if (anyValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                        if (handleValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
                             return;
                         }
 
@@ -386,7 +386,7 @@ module.exports = function(options) {
                 });
             }
 
-            function anyValidationErrors(req, res, next, validationRedirect, redirectQueryParams) {
+            function handleValidationErrors(req, res, next, validationRedirect, redirectQueryParams) {
                 var validationErrors = req.validationErrors(true);
                 if (validationErrors) {
                     handleError(req, res, next, 'validationErrors', validationErrors, validationRedirect, redirectQueryParams);

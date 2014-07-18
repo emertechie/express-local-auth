@@ -2,10 +2,13 @@ module.exports = {
     sendRegistrationEmail: function(user, verifyEmailToken, cb) {
         cb(null);
     },
-    sendPasswordResetEmail: function(user, token, cb) {
+    sendForgotPasswordEmail: function(user, token, cb) {
         cb(null);
     },
-    sendPasswordResetNotificationForUnregisteredEmail: function(email, cb) {
+    sendForgotPasswordNotificationForUnregisteredEmail: function(email, cb) {
+        cb(null);
+    },
+    sendPasswordResetEmail: function(user, cb) {
         cb(null);
     },
     sendPasswordChangedEmail: function(user, cb) {

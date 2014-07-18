@@ -245,7 +245,7 @@ module.exports = function(options) {
                                         passwordResetTokenStore.add(tokenObj, callback);
                                     },
                                     function(addedToken, callback) {
-                                        emailService.sendPasswordResetEmail(user, tokenObj.token, callback);
+                                        emailService.sendForgotPasswordEmail(user, tokenObj.token, callback);
                                     }
                                 ], function(err) {
                                     if (err) {
@@ -254,7 +254,7 @@ module.exports = function(options) {
                                     next();
                                 });
                             } else {
-                                emailService.sendPasswordResetNotificationForUnregisteredEmail(email, function(err) {
+                                emailService.sendForgotPasswordNotificationForUnregisteredEmail(email, function(err) {
                                     if (err) {
                                         return next(err);
                                     }
@@ -264,7 +264,7 @@ module.exports = function(options) {
                         });
                     };
                 },
-                changePasswordView: function() {
+                resetPasswordView: function() {
                     return function changePasswordViewHandler(req, res, next) {
                         var hasTokenParam = 'token' in req.query;
                         if (!hasTokenParam) {
@@ -296,7 +296,7 @@ module.exports = function(options) {
                         });
                     };
                 },
-                changePassword: function(routeOptions) {
+                resetPassword: function(routeOptions) {
                     var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
 
                     return function changePasswordHandler(req, res, next) {
@@ -354,7 +354,7 @@ module.exports = function(options) {
                                                 return next(err);
                                             }
 
-                                            emailService.sendPasswordChangedEmail(user, function(err) {
+                                            emailService.sendPasswordResetEmail(user, function(err) {
                                                 if (err) {
                                                     // TODO logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
                                                 }

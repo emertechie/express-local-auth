@@ -189,24 +189,24 @@ module.exports = function(options) {
                                 return next(err);
                             }
 
-                            if (authenticatedUser) {
-                                authService.logOut(req, authenticatedUser, function (err) {
+                            if (!authenticatedUser) {
+                                return res.redirect(authService.loginPath);
+                            }
+
+                            authService.logOut(req, authenticatedUser, function (err) {
+                                if (err) {
+                                    return next(err);
+                                }
+
+                                var userId = config.userIdGetter(authenticatedUser);
+                                userStore.remove(userId, function (err) {
                                     if (err) {
                                         return next(err);
                                     }
 
-                                    var userId = config.userIdGetter(authenticatedUser);
-                                    userStore.remove(userId, function (err) {
-                                        if (err) {
-                                            return next(err);
-                                        }
-
-                                        next();
-                                    });
+                                    next();
                                 });
-                            } else {
-                                res.redirect(authService.loginPath);
-                            }
+                            });
                         });
                     }
                 },
@@ -360,6 +360,66 @@ module.exports = function(options) {
                                                 }
                                                 next();
                                             });
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    };
+                },
+                changePassword: function(routeOptions) {
+                    var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
+
+                    return function changePasswordHandler(req, res, next) {
+
+                        authService.isAuthenticated(req, function (err, authenticatedUser) {
+                            if (err) {
+                                return next(err);
+                            }
+
+                            if (!authenticatedUser) {
+                                return res.redirect(authService.loginPath);
+                            }
+
+                            req.checkBody('oldPassword', 'Old password required').notEmpty();
+                            req.checkBody('newPassword', 'New password required').notEmpty();
+                            req.checkBody('confirmNewPassword', 'New password confirmation required').notEmpty();
+                            if (handleValidationErrors(req, res, next, errorRedirect)) {
+                                return;
+                            }
+
+                            // Only check confirm password after we know others are ok to avoid returning a redundant error
+                            req.checkBody('confirmNewPassword', 'New password and confirm password do not match').matches('newPassword', req);
+                            if (handleValidationErrors(req, res, next, errorRedirect)) {
+                                return;
+                            }
+
+                            authService.verifyPassword(req.body.oldPassword, authenticatedUser.hashedPassword, function(err, passwordMatches) {
+                                if (err) {
+                                    return next(err);
+                                }
+
+                                if (!passwordMatches) {
+                                    return handleError(req, res, next, 'error', 'Incorrect password', errorRedirect);
+                                }
+
+                                authService.hashPassword(req.body.newPassword, function(err, hashedPassword) {
+                                    if (err) {
+                                        return next(err);
+                                    }
+
+                                    authenticatedUser.hashedPassword = hashedPassword;
+
+                                    userStore.update(authenticatedUser, function(err) {
+                                        if (err) {
+                                            return next(err);
+                                        }
+
+                                        emailService.sendPasswordChangedEmail(authenticatedUser, function(err) {
+                                            if (err) {
+                                                // TODO logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
+                                            }
+                                            next();
                                         });
                                     });
                                 });

@@ -129,7 +129,7 @@ describe('Forgot Password', function() {
                     var tokenDetails = passwordResetTokenStore.tokens[0];
                     assert.equal(tokenDetails.email, existingUserEmail);
                     assert.equal(tokenDetails.userId, "User#1");
-                    assert.isNotNull(tokenDetails.token);
+                    assert.isNotNull(tokenDetails.hashedToken);
                     assert.isNotNull(tokenDetails.expiry);
 
                     done();
@@ -158,8 +158,8 @@ describe('Forgot Password', function() {
 
                     var emailSentOk = fakeEmailService.sendForgotPasswordEmail.calledWith(
                         sinon.match.has("email", email),
-                        // param no. 2 is reset token
-                        sinon.match(/^((?!user).)*$/i) // makes sure 'user' not present - which covers email address and user id
+                        // param no. 2 is query string in form: '?email=xxx&token=yyy', so just checking the token param:
+                        sinon.match(/.*&((?!user).)*$/i) // makes sure 'user' not present - which covers email address and user id
                     );
                     assert.isTrue(emailSentOk, 'Password reset URL does not contain any user identifier');
 
@@ -199,9 +199,10 @@ describe('Forgot Password', function() {
 
     describe('Step 2 - Visiting Reset URL', function() {
 
+        var passwordResetToken;
         var resetPasswordValidationErrors, resetPasswordError;
 
-        beforeEach(function() {
+        beforeEach(function(done) {
             configureApp();
 
             app.post('/forgotpassword', sentry.forgotPassword(), function(req, res) {
@@ -214,13 +215,48 @@ describe('Forgot Password', function() {
                 resetPasswordError = res.locals.error;
                 res.send('Dummy reset password page with token: ' + req.query.token);
             });
+
+            // Set up an existing forgot password request:
+            assert.lengthOf(passwordResetTokenStore.tokens, 0);
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+                requestPasswordReset(existingUserEmail, function (err, unhashedToken) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    assert.lengthOf(passwordResetTokenStore.tokens, 1);
+                    assert.ok(unhashedToken);
+                    passwordResetToken = unhashedToken;
+
+                    done();
+                });
+            });
+        });
+
+        it('ensures email is required', function(done) {
+            request(app)
+                .get('/resetpassword?email=&token=' + passwordResetToken)
+                .expect(400)
+                .expect(function() {
+                    assert.deepEqual(resetPasswordValidationErrors, {
+                        email: {
+                            param: 'email',
+                            msg: 'Email address required',
+                            value: ''
+                        }
+                    });
+                })
+                .end(done);
         });
 
         it('ensures token is required', function(done) {
             var token = '';
 
             request(app)
-                .get('/resetpassword?token=' + token)
+                .get('/resetpassword?email=' + existingUserEmail + '&token=' + token)
                 .expect(400)
                 .expect(function() {
                     assert.deepEqual(resetPasswordValidationErrors, {
@@ -238,7 +274,7 @@ describe('Forgot Password', function() {
             var token = 'unknown';
 
             request(app)
-                .get('/resetpassword?token=' + token)
+                .get('/resetpassword?email=' + existingUserEmail + '&token=' + token)
                 .expect(400)
                 .expect(function() {
                     assert.equal(resetPasswordError, 'Unknown or expired token');
@@ -247,52 +283,28 @@ describe('Forgot Password', function() {
         });
 
         it('ensures that password reset request is only valid for limited period of time', function(done) {
-            registerUser(existingUserEmail, existingUserPassword, function(err) {
-                if (err) {
-                    return done(err);
-                }
-                requestPasswordReset(existingUserEmail, function (err) {
-                    if (err) {
-                        return done(err);
-                    }
+            // expire the existing token:
+            assert.lengthOf(passwordResetTokenStore.tokens, 1);
+            passwordResetTokenStore.tokens[0].expiry = new Date(Date.now() - 1);
 
-                    var expiredToken = setupExpiredPasswordResetToken();
-
-                    request(app)
-                        .get('/resetpassword?token=' + expiredToken)
-                        .expect(400)
-                        .expect(function() {
-                            assert.equal(resetPasswordError, 'Unknown or expired token');
-                        })
-                        .end(done);
-                });
-            });
+            request(app)
+                .get('/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken)
+                .expect(400)
+                .expect(function() {
+                    assert.equal(resetPasswordError, 'Unknown or expired token');
+                })
+                .end(done);
         });
 
         it('renders password reset response if password reset token is valid', function(done) {
-            registerUser(existingUserEmail, existingUserPassword, function(err) {
-                if (err) {
-                    return done(err);
-                }
-                requestPasswordReset(existingUserEmail, function (err) {
-                    if (err) {
-                        return done(err);
-                    }
-
-                    assert.lengthOf(passwordResetTokenStore.tokens, 1);
-                    var token = passwordResetTokenStore.tokens[0].token;
-                    assert.ok(token);
-
-                    request(app)
-                        .get('/resetpassword?token=' + token)
-                        .expect(200, 'Dummy reset password page with token: ' + token)
-                        .end(done);
-                });
-            });
+            request(app)
+                .get('/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken)
+                .expect(200, 'Dummy reset password page with token: ' + passwordResetToken)
+                .end(done);
         });
     });
 
-    describe('Step 3 - Changing Password', function() {
+    describe('Step 3 - Resetting Password', function() {
 
         var passwordResetToken, resetPasswordValidationErrors, resetPasswordError;
 
@@ -314,18 +326,20 @@ describe('Forgot Password', function() {
                 res.send('Password reset');
             });
 
+            // Set up an existing forgot password request:
+            assert.lengthOf(passwordResetTokenStore.tokens, 0);
             registerUser(existingUserEmail, existingUserPassword, function(err) {
                 if (err) {
                     return done(err);
                 }
-                requestPasswordReset(existingUserEmail, function (err) {
+                requestPasswordReset(existingUserEmail, function (err, unhashedToken) {
                     if (err) {
                         return done(err);
                     }
 
                     assert.lengthOf(passwordResetTokenStore.tokens, 1);
-                    passwordResetToken = passwordResetTokenStore.tokens[0].token;
-                    assert.ok(passwordResetToken);
+                    assert.ok(unhashedToken);
+                    passwordResetToken = unhashedToken;
 
                     done();
                 });
@@ -333,9 +347,10 @@ describe('Forgot Password', function() {
         });
 
         it('ensures token is required', function(done) {
-            var postData = { password: 'foo', confirmPassword: 'foo', token: '' };
+            var postData = { token: '', email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=';
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     token: {
                         param: 'token',
@@ -346,9 +361,24 @@ describe('Forgot Password', function() {
             });
         });
 
+        it('ensures email is required', function(done) {
+            var postData = { email: '', token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=&token=' + passwordResetToken;
+
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
+                assert.deepEqual(resetPasswordValidationErrors, [{
+                    email: {
+                        param: 'email',
+                        msg: 'Email address required',
+                        value: ''
+                    }
+                }]);
+            });
+        });
+
         it('ensures password is required', function(done) {
-            var postData = { password: '', confirmPassword: 'foo', token: passwordResetToken };
-            var expectedRedirectPath = '/resetpassword?token=' + passwordResetToken;
+            var postData = { password: '', confirmPassword: 'foo', token: passwordResetToken, email: existingUserEmail };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
@@ -365,8 +395,8 @@ describe('Forgot Password', function() {
         });
 
         it('ensures confirm password is required', function(done) {
-            var postData = { password: 'foo', confirmPassword: '', token: passwordResetToken };
-            var expectedRedirectPath = '/resetpassword?token=' + passwordResetToken;
+            var postData = { password: 'foo', confirmPassword: '', token: passwordResetToken, email: existingUserEmail };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
@@ -383,8 +413,8 @@ describe('Forgot Password', function() {
         });
 
         it('ensures password matches confirm password', function(done) {
-            var postData = { password: 'foo', confirmPassword: 'not-foo', token: passwordResetToken };
-            var expectedRedirectPath = '/resetpassword?token=' + passwordResetToken;
+            var postData = { password: 'foo', confirmPassword: 'not-foo', token: passwordResetToken, email: existingUserEmail };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
@@ -401,45 +431,33 @@ describe('Forgot Password', function() {
         });
 
         it('ensures invalid password request tokens are ignored', function(done) {
-            var postData = { password: 'foo', confirmPassword: 'foo', token: 'unknown-token' };
-            var expectedRedirectPath = '/resetpassword?token=unknown-token';
+            var postData = { token: 'unknown-token', email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=unknown-token';
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
                 assert.equal(resetPasswordError, 'Unknown or expired token');
-            }, {
-                expectedGetStatus: 400
+            });
+        });
+
+        it('ensures unknown password request emails are ignored', function(done) {
+            var postData = { email: 'unknown-email@example.com', token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=unknown-email@example.com&token=' + passwordResetToken;
+
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+                assert.equal(resetPasswordError, 'Unknown or expired token');
             });
         });
 
         it('ensures password reset tokens for unknown users are ignored', function(done) {
-            var token;
-            capturePasswordResetToken(function(_token) {
-                token = _token;
-            });
 
-            var email = 'anotheruser@foo.com';
+            // Just remove all users so no possibility of a match:
+            userStore.users = [];
 
-            registerUser(email, 'password', function(err) {
-                if (err) {
-                    return done(err);
-                }
-                requestPasswordReset(email, function (err) {
-                    if (err) {
-                        return done(err);
-                    }
+            var postData = { email: existingUserEmail, token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-                    // Make sure the password reset token won't match any user:
-                    _.each(userStore.users, function(user, i) {
-                        user.id = 'Unknown-User-' + i;
-                    });
-
-                    var postData = { password: 'foo', confirmPassword: 'foo', token: token };
-                    var expectedRedirectPath = '/resetpassword?token=' + token;
-
-                    utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
-                        assert.equal(resetPasswordError, 'Unknown or expired token');
-                    });
-                });
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
+                assert.equal(resetPasswordError, 'Unknown or expired token');
             });
         });
 
@@ -449,7 +467,7 @@ describe('Forgot Password', function() {
 
             request(app)
                 .post('/resetpassword')
-                .send({ password: newPassword, confirmPassword: newPassword, token: passwordResetToken })
+                .send({ password: newPassword, confirmPassword: newPassword, token: passwordResetToken, email: existingUserEmail })
                 .expect(200, 'Password reset')
                 .expect(function() {
                     assert.lengthOf(userStore.users, 1);
@@ -462,7 +480,7 @@ describe('Forgot Password', function() {
         it('deletes password reset token after password reset', function(done) {
             assert.lengthOf(passwordResetTokenStore.tokens, 1);
 
-            resetPassword(passwordResetToken, 'new-password', function(err) {
+            resetPassword(existingUserEmail, passwordResetToken, 'new-password', function(err) {
                 if (err) {
                     return done(err);
                 }
@@ -476,7 +494,7 @@ describe('Forgot Password', function() {
 
             fakeEmailService.sendPasswordResetEmail = sinon.stub().yields(null);
 
-            resetPassword(passwordResetToken, 'new-password', function(err) {
+            resetPassword(existingUserEmail, passwordResetToken, 'new-password', function(err) {
                 if (err) {
                     return done(err);
                 }
@@ -490,20 +508,6 @@ describe('Forgot Password', function() {
         });
     });
 
-    function setupExpiredPasswordResetToken() {
-
-        // Make sure only 1 token in store and that it looks legit
-        assert.lengthOf(passwordResetTokenStore.tokens, 1);
-        var tokenObj = passwordResetTokenStore.tokens[0];
-        assert.isNotNull(tokenObj.expiry);
-        assert.typeOf(tokenObj.expiry, 'date');
-
-        // expire token:
-        tokenObj.expiry = new Date(Date.now() - 1);
-
-        return tokenObj.token;
-    }
-
     function registerUser(email, password, cb) {
         request(app)
             .post('/register')
@@ -512,25 +516,42 @@ describe('Forgot Password', function() {
             .end(cb);
     }
 
-    function requestPasswordReset(email, cb) {
+    function requestPasswordReset(email, callback) {
+        var orig = fakeEmailService.sendForgotPasswordEmail;
+
+        var unhashedToken;
+        fakeEmailService.sendForgotPasswordEmail = function(user, verifyQueryString, cb) {
+
+            unhashedToken = verifyQueryString.substr(verifyQueryString.lastIndexOf('=') + 1);
+
+            fakeEmailService.sendForgotPasswordEmail = orig;
+            orig(user, verifyQueryString, cb);
+        };
+
         request(app)
             .post('/forgotpassword')
             .send({ email: email })
             .expect(200)
-            .end(cb);
+            .end(function(err) {
+                if (err) {
+                    return callback(err);
+                }
+
+                callback(null, unhashedToken);
+            });
     }
 
     function capturePasswordResetToken(callback) {
-        fakeEmailService.sendForgotPasswordEmail = function(user, token, cb) {
+        fakeEmailService.sendForgotPasswordEmail = function(user, verifyQueryString, cb) {
             callback(token);
             cb(null);
         };
     }
 
-    function resetPassword(token, newPassword, cb) {
+    function resetPassword(email, token, newPassword, cb) {
         request(app)
             .post('/resetpassword')
-            .send({ password: newPassword, confirmPassword: newPassword, token: token })
+            .send({ password: newPassword, confirmPassword: newPassword, token: token, email: email })
             .expect(200, 'Password reset')
             .end(cb);
     }

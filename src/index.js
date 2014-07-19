@@ -230,14 +230,22 @@ module.exports = function(options) {
                             res.locals.user = user;
 
                             if (user) {
+                                var unhashedToken = uuid.v4().replace(/-/g, '');
+
                                 var tokenObj = {
                                     email: email,
                                     userId: config.userIdGetter(user),
-                                    token: uuid.v4(),
                                     expiry: new Date(Date.now() + (options.tokenExpirationMins * 60 * 1000))
                                 };
 
                                 async.waterfall([
+                                    function(callback) {
+                                        authService.hashPassword(unhashedToken, callback);
+                                    },
+                                    function(hashedToken, callback) {
+                                        tokenObj.hashedToken = hashedToken;
+                                        callback(null);
+                                    },
                                     function(callback) {
                                         passwordResetTokenStore.removeAllByEmail(email, callback);
                                     },
@@ -245,7 +253,8 @@ module.exports = function(options) {
                                         passwordResetTokenStore.add(tokenObj, callback);
                                     },
                                     function(addedToken, callback) {
-                                        emailService.sendForgotPasswordEmail(user, tokenObj.token, callback);
+                                        var verifyQueryString = '?email=' + email + '&token=' + unhashedToken;
+                                        emailService.sendForgotPasswordEmail(user, verifyQueryString, callback);
                                     }
                                 ], function(err) {
                                     if (err) {
@@ -267,12 +276,17 @@ module.exports = function(options) {
                 resetPasswordView: function() {
                     return function changePasswordViewHandler(req, res, next) {
                         var hasTokenParam = 'token' in req.query;
-                        if (!hasTokenParam) {
+                        var hasFlashErrors = (req.session && req.session.flash)
+                            ? req.session.flash.validationErrors || req.session.flash.error
+                            : false;
+
+                        if (!hasTokenParam || hasFlashErrors) {
                             // we've probably redirected to page on an error so just render view:
                             return next();
                         }
 
                         req.checkQuery('token', 'Password reset token required').notEmpty();
+                        req.checkQuery('email', 'Email address required').notEmpty();
                         var validationErrors = req.validationErrors(true);
                         if (validationErrors) {
                             res.status(400);
@@ -281,8 +295,9 @@ module.exports = function(options) {
                         }
 
                         var token = req.query.token;
+                        var email = req.query.email;
 
-                        findAndVerifyPasswordResetToken(token, function(err, isValid) {
+                        findAndVerifyPasswordResetToken(email, token, function(err, isValid) {
                             if (err) {
                                 return next(err);
                             }
@@ -301,11 +316,12 @@ module.exports = function(options) {
 
                     return function changePasswordHandler(req, res, next) {
 
+                        req.checkBody('email', 'Email address required').notEmpty();
                         req.checkBody('token', 'Password reset token required').notEmpty();
                         req.checkBody('password', 'New password required').notEmpty();
                         req.checkBody('confirmPassword', 'Password confirmation required').notEmpty();
 
-                        var errorRedirectQueryParams = req.body.token ? '?token=' + req.body.token : '';
+                        var errorRedirectQueryParams = '?email=' + (req.body.email || '') + '&token=' + (req.body.token || '');
 
                         if (handleValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
                             return;
@@ -318,9 +334,10 @@ module.exports = function(options) {
                         }
 
                         var token = req.body.token;
+                        var email = req.body.email;
                         var password = req.body.password;
 
-                        findAndVerifyPasswordResetToken(token, function(err, isValid, tokenDetails) {
+                        findAndVerifyPasswordResetToken(email, token, function(err, isValid, tokenDetails) {
                             if (err) {
                                 return next(err);
                             }
@@ -429,20 +446,26 @@ module.exports = function(options) {
                 }
             };
 
-            function findAndVerifyPasswordResetToken(token, cb) {
-                passwordResetTokenStore.findByToken(token, function(err, tokenDetails) {
+            function findAndVerifyPasswordResetToken(email, unhashedToken, cb) {
+                passwordResetTokenStore.findByEmail(email, function(err, tokenDetails) {
                     if (err) {
                         return cb(err);
                     }
 
-                    var isValid =
+                    var isValidStep1 =
                         tokenDetails &&
-                        tokenDetails.token &&
+                        tokenDetails.hashedToken &&
                         tokenDetails.expiry &&
                         tokenDetails.expiry instanceof Date &&
                         tokenDetails.expiry.getTime() >= Date.now();
 
-                    cb(null, isValid, tokenDetails);
+                    if (!isValidStep1) {
+                        cb(null, isValidStep1, isValidStep1 ? tokenDetails : null);
+                    } else {
+                        authService.verifyPassword(unhashedToken, tokenDetails.hashedToken, function(err, isValidStep2) {
+                            cb(null, isValidStep2, isValidStep2 ? tokenDetails : null);
+                        });
+                    }
                 });
             }
 

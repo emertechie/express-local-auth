@@ -19,9 +19,17 @@ FakeTokenStore.prototype.removeAllByEmail = function(email, callback) {
     callback(null);
 };
 
+// TODO: remove once verify email token is also hashed
 FakeTokenStore.prototype.findByToken = function(token, callback) {
     var found = _.find(this.tokens, function(tokenDetails) {
         return tokenDetails.token === token;
+    });
+    callback(null, found);
+};
+
+FakeTokenStore.prototype.findByEmail = function(email, callback) {
+    var found = _.find(this.tokens, function(tokenDetails) {
+        return tokenDetails.email === email;
     });
     callback(null, found);
 };

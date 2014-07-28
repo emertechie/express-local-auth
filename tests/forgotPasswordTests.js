@@ -430,9 +430,22 @@ describe('Forgot Password', function() {
             });
         });
 
-        it('ensures invalid password request tokens are ignored', function(done) {
+        it('ensures unknown password request tokens are ignored', function(done) {
             var postData = { token: 'unknown-token', email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=unknown-token';
+
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+                assert.equal(resetPasswordError, 'Unknown or expired token');
+            });
+        });
+
+        it('ensures that expired tokens are ignored', function(done) {
+            // expire the existing token:
+            assert.lengthOf(passwordResetTokenStore.tokens, 1);
+            passwordResetTokenStore.tokens[0].expiry = new Date(Date.now() - 1);
+
+            var postData = { token: passwordResetToken, email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
+            var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
                 assert.equal(resetPasswordError, 'Unknown or expired token');

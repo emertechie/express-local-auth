@@ -170,7 +170,7 @@ module.exports = function(options) {
                                 });
                             } else {
                                 res.status(400);
-                                res.locals.error = 'Unknown or invalid verify email token';
+                                res.locals.error = 'Unknown or invalid token';
                                 next();
                             }
                         });

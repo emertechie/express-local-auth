@@ -329,7 +329,7 @@ describe('Registration', function() {
                 .get('/verifyemail?token=unknown-token')
                 .expect(400)
                 .expect(function() {
-                    assert.equal(verifyEmailError, 'Unknown or invalid verify email token')
+                    assert.equal(verifyEmailError, 'Unknown or invalid token')
                 })
                 .end(done);
         });

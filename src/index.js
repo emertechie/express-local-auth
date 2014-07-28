@@ -75,7 +75,7 @@ module.exports = function(options) {
                             userDetails.emailVerified = false;
                         }
 
-                        authService.hashPassword(userDetails.password, function(err, hashedPassword) {
+                        authService.hash(userDetails.password, function(err, hashedPassword) {
                             if (err) {
                                 // TODO logger.error('Error hashing password while registering user', err);
                                 return next(err);
@@ -240,7 +240,7 @@ module.exports = function(options) {
 
                                 async.waterfall([
                                     function(callback) {
-                                        authService.hashPassword(unhashedToken, callback);
+                                        authService.hash(unhashedToken, callback);
                                     },
                                     function(hashedToken, callback) {
                                         tokenObj.hashedToken = hashedToken;
@@ -346,7 +346,7 @@ module.exports = function(options) {
                                 return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
                             }
 
-                            authService.hashPassword(password, function(err, hashedPassword) {
+                            authService.hash(password, function(err, hashedPassword) {
                                 if (err) {
                                     return next(err);
                                 }
@@ -411,7 +411,7 @@ module.exports = function(options) {
                                 return;
                             }
 
-                            authService.verifyPassword(req.body.oldPassword, authenticatedUser.hashedPassword, function(err, passwordMatches) {
+                            authService.verifyHash(req.body.oldPassword, authenticatedUser.hashedPassword, function(err, passwordMatches) {
                                 if (err) {
                                     return next(err);
                                 }
@@ -420,7 +420,7 @@ module.exports = function(options) {
                                     return handleError(req, res, next, 'error', 'Incorrect password', errorRedirect);
                                 }
 
-                                authService.hashPassword(req.body.newPassword, function(err, hashedPassword) {
+                                authService.hash(req.body.newPassword, function(err, hashedPassword) {
                                     if (err) {
                                         return next(err);
                                     }
@@ -462,7 +462,7 @@ module.exports = function(options) {
                     if (!isValidStep1) {
                         cb(null, isValidStep1, isValidStep1 ? tokenDetails : null);
                     } else {
-                        authService.verifyPassword(unhashedToken, tokenDetails.hashedToken, function(err, isValidStep2) {
+                        authService.verifyHash(unhashedToken, tokenDetails.hashedToken, function(err, isValidStep2) {
                             cb(null, isValidStep2, isValidStep2 ? tokenDetails : null);
                         });
                     }

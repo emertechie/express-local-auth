@@ -1,10 +1,10 @@
 module.exports = {
     loginPath: '/login',
-    hashPassword: function(password, cb) {
-        cb(null, 'hashed-' + password);
+    hash: function(unhashed, cb) {
+        cb(null, 'hashed-' + unhashed);
     },
-    verifyPassword: function(unhashedPassword, hashedPassword, cb) {
-        var matches = 'hashed-' + unhashedPassword === hashedPassword;
+    verifyHash: function(unhashed, hashed, cb) {
+        var matches = 'hashed-' + unhashed === hashed;
         return cb(null, matches);
     },
     markLoggedInAfterAuthentication: function(req, user, cb) {

@@ -19,10 +19,10 @@ module.exports = function(options) {
 
     return function RegistrationComponentFactory(router, authService, config) {
         if (!router) {
-            throw new Error('Required router parameter');
+            throw new Error('Missing required router parameter');
         }
         if (!config) {
-            throw new Error('Required configuration parameter missing');
+            throw new Error('Missing required configuration parameter');
         }
         if (!config.userStore) {
             throw new Error('Missing required userStore config');

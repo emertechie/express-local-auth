@@ -7,7 +7,6 @@ var express = require('express'),
 module.exports = function(options) {
 
     options = _.defaults(options || {}, {
-        registerView: 'register',
         tokenExpirationMins: 60,
         verifyEmail: false,
         useSession: true
@@ -50,11 +49,6 @@ module.exports = function(options) {
 
         function buildRouteHandlers(authService, userStore, emailService) {
             return {
-                registerView: function() {
-                    return function registerViewHandler(req, res) {
-                        res.render(options.registerView);
-                    }
-                },
                 register: function(routeOptions) {
                     var errorRedirect = getErrorRedirectOption(routeOptions || {}, options.useSession);
 

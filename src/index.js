@@ -250,6 +250,7 @@ module.exports = function(options) {
 
                         userStore.findByEmail(email, function(err, user) {
                             if (err) {
+                                logger.error('Error finding user "%s" in user store', email, err);
                                 return next(err);
                             }
 
@@ -280,16 +281,21 @@ module.exports = function(options) {
                                         passwordResetTokenStore.add(tokenObj, callback);
                                     },
                                     function(addedToken, callback) {
+                                        logger.info('Sending forgot password email for user "%s"', email);
+
                                         var verifyQueryString = '?email=' + email + '&token=' + unhashedToken;
                                         emailService.sendForgotPasswordEmail(user, verifyQueryString, callback);
                                     }
                                 ], function(err) {
                                     if (err) {
+                                        logger.error('Error during forgot password process for user "%s"', email, err);
                                         return next(err);
                                     }
                                     next();
                                 });
                             } else {
+                                logger.info('Forgot password process attempted for unregistered email "%s"', email);
+
                                 emailService.sendForgotPasswordNotificationForUnregisteredEmail(email, function(err) {
                                     if (err) {
                                         return next(err);
@@ -326,10 +332,13 @@ module.exports = function(options) {
 
                         findAndVerifyPasswordResetToken(email, token, function(err, isValid) {
                             if (err) {
+                                logger.error('Error finding or verifying password reset token for email "%s" while rendering password reset view', email, err);
                                 return next(err);
                             }
 
                             if (!isValid) {
+                                logger.info('Invalid password reset token found for email "%s" while rendering password reset view', email);
+
                                 res.status(400);
                                 res.locals.error = 'Unknown or expired token';
                             }
@@ -366,23 +375,28 @@ module.exports = function(options) {
 
                         findAndVerifyPasswordResetToken(email, token, function(err, isValid, tokenDetails) {
                             if (err) {
+                                logger.error('Error finding or verifying password reset token for email "%s" in reset password handler', email, err);
                                 return next(err);
                             }
 
                             if (!isValid) {
+                                logger.info('Invalid password reset token found for email "%s" in reset password handler', email);
                                 return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
                             }
 
                             authService.hash(password, function(err, hashedPassword) {
                                 if (err) {
+                                    logger.error('Error hashing password for email "%s" in reset password handler', email, err);
                                     return next(err);
                                 }
 
                                 userStore.get(tokenDetails.userId, function(err, user) {
                                     if (err) {
+                                        logger.error('Error getting user "%s" in reset password handler', email, err);
                                         return next(err);
                                     }
                                     if (!user) {
+                                        logger.info('Unknown user "%s" in reset password handler', email);
                                         return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
                                     }
 
@@ -390,18 +404,22 @@ module.exports = function(options) {
 
                                     userStore.update(user, function(err) {
                                         if (err) {
+                                            logger.error('Error updating user "%s" in reset password handler', email, err);
                                             return next(err);
                                         }
 
                                         passwordResetTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
                                             if (err) {
+                                                logger.error('Error removing all password reset tokens for user "%s"', email, err);
                                                 return next(err);
                                             }
 
                                             emailService.sendPasswordResetEmail(user, function(err) {
                                                 if (err) {
-                                                    // TODO logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
+                                                    logger.error('Could not send password reset email for user "%s"', email, err);
                                                 }
+
+                                                logger.info('User "%s" successfully reset password', email);
                                                 next();
                                             });
                                         });
@@ -418,12 +436,15 @@ module.exports = function(options) {
 
                         authService.isAuthenticated(req, function (err, authenticatedUser) {
                             if (err) {
+                                logger.error('Error checking if user is authenticated in change password handler', err);
                                 return next(err);
                             }
 
                             if (!authenticatedUser) {
                                 return res.redirect(authService.loginPath);
                             }
+
+                            var email = authenticatedUser.email;
 
                             req.checkBody('oldPassword', 'Old password required').notEmpty();
                             req.checkBody('newPassword', 'New password required').notEmpty();
@@ -440,15 +461,18 @@ module.exports = function(options) {
 
                             authService.verifyHash(req.body.oldPassword, authenticatedUser.hashedPassword, function(err, passwordMatches) {
                                 if (err) {
+                                    logger.error('Error verifying old password hash for user "%s" in change password handler', email, err);
                                     return next(err);
                                 }
 
                                 if (!passwordMatches) {
+                                    logger.info('Incorrect old password for user "%s" in change password handler', email, err);
                                     return handleError(req, res, next, 'error', 'Incorrect password', errorRedirect);
                                 }
 
                                 authService.hash(req.body.newPassword, function(err, hashedPassword) {
                                     if (err) {
+                                        logger.error('Error hashing new password for user "%s" in change password handler', email, err);
                                         return next(err);
                                     }
 
@@ -456,13 +480,16 @@ module.exports = function(options) {
 
                                     userStore.update(authenticatedUser, function(err) {
                                         if (err) {
+                                            logger.error('Error updating user "%s" in change password handler', email, err);
                                             return next(err);
                                         }
 
                                         emailService.sendPasswordChangedEmail(authenticatedUser, function(err) {
                                             if (err) {
-                                                // TODO logger.error('Could not send password changed email for user with email: ' + tokenDetails.email);
+                                                logger.error('Could not send password changed email for user "%s"', email, err);
                                             }
+
+                                            logger.info('User "%s" successfully changed password', email);
                                             next();
                                         });
                                     });

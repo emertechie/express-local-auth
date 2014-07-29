@@ -1,16 +1,26 @@
-var express = require('express'),
-    expressValidator = require('express-validator'),
+var expressValidator = require('express-validator'),
     _ = require('lodash'),
     uuid = require('node-uuid'),
     async = require('async');
+
+var noOpLogFn = function(format /*, args*/) {};
+var noOpLogger = {
+    debug: noOpLogFn,
+    info: noOpLogFn,
+    warn: noOpLogFn,
+    error: noOpLogFn
+};
 
 module.exports = function(options) {
 
     options = _.defaults(options || {}, {
         tokenExpirationMins: 60,
         verifyEmail: false,
-        useSession: true
+        useSession: true,
+        logger: noOpLogger
     });
+
+    var logger = options.logger;
 
     expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
         var valueToMatch = req.param(expectedMatchParam);
@@ -71,7 +81,7 @@ module.exports = function(options) {
 
                         authService.hash(userDetails.password, function(err, hashedPassword) {
                             if (err) {
-                                // TODO logger.error('Error hashing password while registering user', err);
+                                logger.error('Error hashing password while registering user "%s"', email, err);
                                 return next(err);
                             }
 
@@ -80,24 +90,28 @@ module.exports = function(options) {
 
                             userStore.add(userDetails, function(err, userAlreadyExists, user) {
                                 if (err) {
+                                    logger.error('Error adding user "%s" to userStore', email, err);
                                     return next(err);
                                 }
                                 if (userAlreadyExists) {
+                                    logger.info('Registration details for user "%s" already exist', email);
                                     return handleError(req, res, next, 'error', 'Registration details already in use', errorRedirect);
                                 }
 
                                 var sendRegEmailAndLogIn = function(verifyEmailToken) {
                                     emailService.sendRegistrationEmail(user, verifyEmailToken, function(err) {
                                         if (err) {
-                                            // log error but don't return it
-                                            // TODO logger.error('Error sending registration email for user ' + userId, err);
+                                            // log error but continue
+                                            logger.error('Error sending registration email to "%s"', email, err);
                                         }
 
                                         authService.markLoggedInAfterAuthentication(req, user, function(err) {
                                             if (err) {
-                                                // TODO logger.error('Could not log in user ' + userId + ' after registration', err);
+                                                logger.error('Could not log in user "%s" after registration', email, err);
                                                 return next(err);
                                             }
+
+                                            logger.info('Successfully registered user "%s"', email);
                                             next();
                                         });
                                     });
@@ -109,10 +123,14 @@ module.exports = function(options) {
                                         userId: config.userIdGetter(user),
                                         token: uuid.v4()
                                     };
+
                                     verifyEmailTokenStore.add(tokenObj, function(err) {
                                         if (err) {
+                                            logger.error('Could not add verify email token to store for user "%s" during registration', email, err);
                                             return next(err);
                                         }
+
+                                        logger.debug('Added verify email token for user "%s" during registration', email);
                                         sendRegEmailAndLogIn(tokenObj.token);
                                     });
                                 } else {
@@ -136,6 +154,7 @@ module.exports = function(options) {
 
                         verifyEmailTokenStore.findByToken(token, function(err, tokenDetails) {
                             if (err) {
+                                logger.error('error finding verify email token "%s"', token, err);
                                 return cb(err);
                             }
 
@@ -143,10 +162,13 @@ module.exports = function(options) {
 
                                 userStore.findByEmail(tokenDetails.email, function(err, user) {
                                     if (err) {
+                                        logger.error('error finding user "%s" from verify email token', tokenDetails.email, err);
                                         return next(err);
                                     }
 
                                     if (!user) {
+                                        logger.info('Unknown user "%s" from verify email token "%s"', tokenDetails.email, token);
+
                                         res.status(400);
                                         res.locals.error = 'Unknown or invalid token';
                                         return next();
@@ -156,19 +178,24 @@ module.exports = function(options) {
 
                                     userStore.update(user, function(err) {
                                         if (err) {
+                                            logger.error('Error updaing user "%s" after email verified', tokenDetails.email, err);
                                             return next(err);
                                         }
 
                                         verifyEmailTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
                                             if (err) {
+                                                logger.error('Error removing all verify email tokens for user "%s"', tokenDetails.email, err);
                                                 return next(err);
                                             }
 
+                                            logger.info('User "%s" successfully verified email', tokenDetails.email);
                                             next();
                                         });
                                     });
                                 });
                             } else {
+                                logger.info('Unknown verify email token "%s"', token);
+
                                 res.status(400);
                                 res.locals.error = 'Unknown or invalid token';
                                 next();
@@ -180,6 +207,7 @@ module.exports = function(options) {
                     return function unregisterHandler(req, res, next) {
                         authService.isAuthenticated(req, function (err, authenticatedUser) {
                             if (err) {
+                                logger.error('Error checking if user is authenticated during unregister', err);
                                 return next(err);
                             }
 
@@ -187,17 +215,22 @@ module.exports = function(options) {
                                 return res.redirect(authService.loginPath);
                             }
 
+                            var email = authenticatedUser.email;
+
                             authService.logOut(req, authenticatedUser, function (err) {
                                 if (err) {
+                                    logger.error('Error logging out user "%s" during unregister', email, err);
                                     return next(err);
                                 }
 
                                 var userId = config.userIdGetter(authenticatedUser);
                                 userStore.remove(userId, function (err) {
                                     if (err) {
+                                        logger.error('Error removing user "%s" from user store during unregister', email, err);
                                         return next(err);
                                     }
 
+                                    logger.error('User "%s" successfully unregistered', email, err);
                                     next();
                                 });
                             });

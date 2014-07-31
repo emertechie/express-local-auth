@@ -38,6 +38,8 @@ module.exports = {
     configureSentry: function(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, emailService, authService, options) {
         options = options || {};
 
+        var noOpLogFn = function(format /*, args*/) {};
+
         var sentryOptions = _.defaults(options.sentry || {}, {
             userStore: userStore,
             passwordResetTokenStore: passwordResetTokenStore,
@@ -49,7 +51,13 @@ module.exports = {
                     routeHandlers: {}
                 }
             },
-            registration: sentryRegistration(options.registration)
+            registration: sentryRegistration(options.registration),
+            logger: {
+                debug: noOpLogFn,
+                info: noOpLogFn,
+                warn: noOpLogFn,
+                error: noOpLogFn
+            }
         });
 
         sentry.initialize(app, sentryOptions);

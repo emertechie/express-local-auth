@@ -3,24 +3,13 @@ var expressValidator = require('express-validator'),
     uuid = require('node-uuid'),
     async = require('async');
 
-var noOpLogFn = function(format /*, args*/) {};
-var noOpLogger = {
-    debug: noOpLogFn,
-    info: noOpLogFn,
-    warn: noOpLogFn,
-    error: noOpLogFn
-};
-
 module.exports = function(options) {
 
     options = _.defaults(options || {}, {
         tokenExpirationMins: 60,
         verifyEmail: false,
-        useSession: true,
-        logger: noOpLogger
+        useSession: true
     });
-
-    var logger = options.logger;
 
     expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
         var valueToMatch = req.param(expectedMatchParam);
@@ -33,6 +22,9 @@ module.exports = function(options) {
         }
         if (!config) {
             throw new Error('Missing required configuration parameter');
+        }
+        if (!config.logger) {
+            throw new Error('Missing required logger config');
         }
         if (!config.userStore) {
             throw new Error('Missing required userStore config');
@@ -50,6 +42,7 @@ module.exports = function(options) {
         var passwordResetTokenStore = config.passwordResetTokenStore;
         var verifyEmailTokenStore = config.verifyEmailTokenStore;
         var emailService = config.emailService;
+        var logger = config.logger;
 
         router.use(expressValidator());
 

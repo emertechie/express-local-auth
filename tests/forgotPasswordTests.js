@@ -197,6 +197,76 @@ describe('Forgot Password', function() {
         });
     });
 
+    describe('Step 1 - Requesting Reset (when email verification required)', function() {
+
+        var forgotPasswordError;
+
+        beforeEach(function () {
+            configureApp({
+                registration: {
+                    verifyEmail: true
+                }
+            });
+
+            app.post('/forgotpassword', sentry.forgotPassword(), function (req, res) {
+                var email = req.body.email;
+                res.send('Password reset email sent to: ' + email);
+            });
+            app.get('/forgotpassword', function (req, res) {
+                forgotPasswordError = req.session.flash.error;
+                res.send('Dummy forgot password page');
+            });
+        });
+
+        it('forbids resetting password if user email not previously verified', function(done) {
+            assert.lengthOf(userStore.users, 0);
+
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                assert.lengthOf(userStore.users, 1);
+                assert.isFalse(userStore.users[0].emailVerified);
+
+                var postData = { email: existingUserEmail };
+
+                utils.verifyPostRedirectGet(app, '/forgotpassword', postData, done, function verifyAfterGet() {
+                    var expectedMsg = 'Please verify your email address first by clicking on the link in the registration email';
+                    assert.equal(forgotPasswordError, expectedMsg);
+                });
+            });
+        });
+
+        it('sends forgot password email if user email previously verified', function(done) {
+            fakeEmailService.sendForgotPasswordEmail = sinon.stub().yields(null);
+
+            assert.lengthOf(userStore.users, 0);
+
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                // Mark email verified (this functionality tested elsewhere)
+                assert.lengthOf(userStore.users, 1);
+                userStore.users[0].emailVerified = true;
+
+                request(app)
+                    .post('/forgotpassword')
+                    .send({ email: existingUserEmail })
+                    .expect(200)
+                    .expect(function() {
+                        var emailSentOk = fakeEmailService.sendForgotPasswordEmail.calledWith(
+                            sinon.match.has("email", existingUserEmail)
+                        );
+                        assert.isTrue(emailSentOk, 'Sends email');
+                    })
+                    .end(done);
+            });
+        });
+    });
+
     describe('Step 2 - Visiting Reset URL', function() {
 
         var passwordResetToken;

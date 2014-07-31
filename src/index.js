@@ -247,6 +247,11 @@ module.exports = function(options) {
                                 return next(err);
                             }
 
+                            if (options.verifyEmail && !user.emailVerified) {
+                                var errorMsg = 'Please verify your email address first by clicking on the link in the registration email';
+                                return handleError(req, res, next, 'error', errorMsg, errorRedirect);
+                            }
+
                             // Note: setting this in case next handler needs to know if user found
                             res.locals.user = user;
 

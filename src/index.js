@@ -247,8 +247,9 @@ module.exports = function(options) {
                                 return next(err);
                             }
 
-                            // Note: setting this in case next handler needs to know if user found
+                            // Make these available for next handler
                             res.locals.user = user;
+                            res.locals.email = email;
 
                             if (user) {
                                 if (options.verifyEmail && !user.emailVerified) {
@@ -327,6 +328,9 @@ module.exports = function(options) {
 
                         var token = req.query.token;
                         var email = req.query.email;
+                        // Add these to locals so they can be rendered as hidden form inputs
+                        res.locals.token = token;
+                        res.locals.email = email;
 
                         findAndVerifyPasswordResetToken(email, token, function(err, isValid) {
                             if (err) {

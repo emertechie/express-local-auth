@@ -62,11 +62,11 @@ module.exports = function(options) {
                             return;
                         }
 
-                        var email = req.param('email');
+                        var email = req.body.email;
                         var userDetails = {
                             email: email,
-                            username: req.param('username') || email,
-                            password: req.param('password')
+                            username: req.body.username || email,
+                            password: req.body.password
                         };
                         if (options.verifyEmail) {
                             userDetails.emailVerified = false;
@@ -91,8 +91,8 @@ module.exports = function(options) {
                                     return handleError(req, res, next, 'errors', 'Registration details already in use', errorRedirect);
                                 }
 
-                                var sendRegEmailAndLogIn = function(verifyEmailToken) {
-                                    emailService.sendRegistrationEmail(user, verifyEmailToken, function(err) {
+                                var sendRegEmailAndLogIn = function(verifyQueryString) {
+                                    emailService.sendRegistrationEmail(user, verifyQueryString, function(err) {
                                         if (err) {
                                             // log error but continue
                                             logger.error('Error sending registration email to "%s"', email, err);
@@ -113,18 +113,28 @@ module.exports = function(options) {
                                 if (options.verifyEmail) {
                                     var tokenObj = {
                                         email: email,
-                                        userId: config.userIdGetter(user),
-                                        token: uuid.v4()
+                                        userId: config.userIdGetter(user)
                                     };
 
-                                    verifyEmailTokenStore.add(tokenObj, function(err) {
+                                    var unhashedToken = uuid.v4().replace(/-/g, '');
+                                    authService.hash(unhashedToken, function(err, hashedToken) {
                                         if (err) {
-                                            logger.error('Could not add verify email token to store for user "%s" during registration', email, err);
+                                            logger.error('Error hashing veryify email token for user "%s" during registration', email, err);
                                             return next(err);
                                         }
 
-                                        logger.debug('Added verify email token for user "%s" during registration', email);
-                                        sendRegEmailAndLogIn(tokenObj.token);
+                                        tokenObj.hashedToken = hashedToken;
+
+                                        verifyEmailTokenStore.add(tokenObj, function(err) {
+                                            if (err) {
+                                                logger.error('Could not add verify email token to store for user "%s" during registration', email, err);
+                                                return next(err);
+                                            }
+
+                                            logger.debug('Added verify email token for user "%s" during registration', email);
+                                            var verifyQueryString = '?email=' + email + '&token=' + unhashedToken;
+                                            sendRegEmailAndLogIn(verifyQueryString);
+                                        });
                                     });
                                 } else {
                                     sendRegEmailAndLogIn();
@@ -135,6 +145,7 @@ module.exports = function(options) {
                 },
                 verifyEmailView: function() {
                     return function verifyEmailAddressHandler(req, res, next) {
+                        req.checkQuery('email', 'Valid email address required').notEmpty().isEmail();
                         req.checkQuery('token', 'Verify email token required').notEmpty();
                         var validationErrors = req.validationErrors(true);
                         if (validationErrors) {
@@ -143,24 +154,24 @@ module.exports = function(options) {
                             return next();
                         }
 
+                        var email = req.query.email;
                         var token = req.query.token;
 
-                        verifyEmailTokenStore.findByToken(token, function(err, tokenDetails) {
+                        findAndVerifyRegistrationEmailToken(email, token, function(err, verified) {
                             if (err) {
-                                logger.error('error finding verify email token "%s"', token, err);
+                                logger.error('Error finding or verfying the verify email token using email "%s"', email, err);
                                 return cb(err);
                             }
 
-                            if (tokenDetails) {
-
-                                userStore.findByEmail(tokenDetails.email, function(err, user) {
+                            if (verified) {
+                                userStore.findByEmail(email, function(err, user) {
                                     if (err) {
-                                        logger.error('error finding user "%s" from verify email token', tokenDetails.email, err);
+                                        logger.error('error finding user "%s" in verify email view', email, err);
                                         return next(err);
                                     }
 
                                     if (!user) {
-                                        logger.info('Unknown user "%s" from verify email token "%s"', tokenDetails.email, token);
+                                        logger.info('Unknown user "%s" for verify email token "%s"', email, token);
 
                                         res.status(400);
                                         var useRedirect = false;
@@ -171,23 +182,23 @@ module.exports = function(options) {
 
                                     userStore.update(user, function(err) {
                                         if (err) {
-                                            logger.error('Error updaing user "%s" after email verified', tokenDetails.email, err);
+                                            logger.error('Error updaing user "%s" after email verified', email, err);
                                             return next(err);
                                         }
 
-                                        verifyEmailTokenStore.removeAllByEmail(tokenDetails.email, function(err) {
+                                        verifyEmailTokenStore.removeAllByEmail(email, function(err) {
                                             if (err) {
-                                                logger.error('Error removing all verify email tokens for user "%s"', tokenDetails.email, err);
+                                                logger.error('Error removing all verify email tokens for user "%s"', email, err);
                                                 return next(err);
                                             }
 
-                                            logger.info('User "%s" successfully verified email', tokenDetails.email);
+                                            logger.info('User "%s" successfully verified email', email);
                                             next();
                                         });
                                     });
                                 });
                             } else {
-                                logger.info('Unknown verify email token "%s"', token);
+                                logger.info('Unknown or invalid verify email token "%s" for email "%s"', token, email);
 
                                 res.status(400);
                                 var useRedirect = false;
@@ -503,6 +514,26 @@ module.exports = function(options) {
                 }
             };
 
+            function findAndVerifyRegistrationEmailToken(email, unhashedToken, cb) {
+                verifyEmailTokenStore.findByEmail(email, function(err, tokenDetails) {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    if (!tokenDetails) {
+                        logger.info('Could not find verify email token using email "%s"', email);
+                        return cb(null, false, null);
+                    }
+
+                    authService.verifyHash(unhashedToken, tokenDetails.hashedToken, function(err, verified) {
+                        if (err) {
+                            return cb(err);
+                        }
+                        cb(null, verified, tokenDetails);
+                    });
+                });
+            }
+
             function findAndVerifyPasswordResetToken(email, unhashedToken, cb) {
                 passwordResetTokenStore.findByEmail(email, function(err, tokenDetails) {
                     if (err) {
@@ -520,6 +551,9 @@ module.exports = function(options) {
                         cb(null, isValidStep1, isValidStep1 ? tokenDetails : null);
                     } else {
                         authService.verifyHash(unhashedToken, tokenDetails.hashedToken, function(err, isValidStep2) {
+                            if (err) {
+                                return cb(err);
+                            }
                             cb(null, isValidStep2, isValidStep2 ? tokenDetails : null);
                         });
                     }

@@ -195,7 +195,7 @@ describe('Registration', function() {
             assert.lengthOf(userStore.users, 0);
 
             var userForRegEmail;
-            fakeEmailService.sendRegistrationEmail = function(userDetails, verifyEmailToken, callback) {
+            fakeEmailService.sendRegistrationEmail = function(userDetails, verifyQueryString, callback) {
                 userForRegEmail = _.clone(userDetails);
                 callback(null);
             };
@@ -262,9 +262,10 @@ describe('Registration', function() {
 
         it('provides email address verification token when sending registration email', function(done) {
             var userDetails, verifyEmailToken;
-            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
+            fakeEmailService.sendRegistrationEmail = function(_userDetails, verifyQueryString, callback) {
                 userDetails = _.clone(_userDetails);
-                verifyEmailToken = _verifyEmailToken;
+                // Note: verifyQueryString is in the form "?email=xxx&token=yyy"
+                verifyEmailToken = verifyQueryString.substr(verifyQueryString.lastIndexOf('=') + 1);
                 callback(null);
             };
 
@@ -288,13 +289,6 @@ describe('Registration', function() {
         });
 
         it('registers user with emailVerified property set to false initially', function(done) {
-            var userDetails, verifyEmailToken;
-            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
-                userDetails = _.clone(_userDetails);
-                verifyEmailToken = _verifyEmailToken;
-                callback(null);
-            };
-
             assert.lengthOf(userStore.users, 0);
 
             request(app)
@@ -307,9 +301,25 @@ describe('Registration', function() {
                 .end(done);
         });
 
+        it('requires email address when verifying email', function(done) {
+            request(app)
+                .get('/verifyemail?token=foo&email=')
+                .expect(400)
+                .expect(function() {
+                    assert.deepEqual(verifyEmailValidationErrors, {
+                        email: {
+                            param: 'email',
+                            msg: 'Valid email address required',
+                            value: ''
+                        }
+                    });
+                })
+                .end(done);
+        });
+
         it('requires token when verifying email', function(done) {
             request(app)
-                .get('/verifyemail?token=')
+                .get('/verifyemail?email=foo@example.com&token=')
                 .expect(400)
                 .expect(function() {
                     assert.deepEqual(verifyEmailValidationErrors, {
@@ -324,25 +334,29 @@ describe('Registration', function() {
         });
 
         it('rejects attempt to verify email with invalid token', function(done) {
-            request(app)
-                .get('/verifyemail?token=unknown-token')
-                .expect(400)
-                .expect(function() {
-                    assert.deepEqual(verifyEmailErrors, [ 'Unknown or invalid token' ]);
-                })
-                .end(done);
+            registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
+                request(app)
+                    .get('/verifyemail?email=' + userDetails.email + '&token=unknown-token')
+                    .expect(400)
+                    .expect(function() {
+                        assert.deepEqual(verifyEmailErrors, [ 'Unknown or invalid token' ]);
+                    })
+                    .end(done);
+            });
         });
 
         it('rejects attempt to verify email with token for unknown user', function(done) {
             assert.lengthOf(userStore.users, 0);
 
-            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+            registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
 
-                // Clear all users
+                // Some time later, user deletes their account
+
+                // Clear all users:
                 userStore.users = [];
 
                 request(app)
-                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .get('/verifyemail?email=' + userDetails.email + '&token=' + verifyEmailToken)
                     .expect(400)
                     .expect(function() {
                         assert.deepEqual(verifyEmailErrors, [ 'Unknown or invalid token' ]);
@@ -354,9 +368,9 @@ describe('Registration', function() {
         it('marks user email address verified given valid token', function(done) {
             assert.lengthOf(userStore.users, 0);
 
-            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+            registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
                 request(app)
-                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .get('/verifyemail?email=' + userDetails.email + '&token=' + verifyEmailToken)
                     .expect(200)
                     .expect(function() {
                         assert.lengthOf(userStore.users, 1);
@@ -367,12 +381,12 @@ describe('Registration', function() {
         });
 
         it('removes email verification token after use', function(done) {
-            registerUserAndCaptureToken(done, function(verifyEmailToken) {
+            registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
 
                 assert.lengthOf(verifyEmailTokenStore.tokens, 1);
 
                 request(app)
-                    .get('/verifyemail?token=' + verifyEmailToken)
+                    .get('/verifyemail?email=' + userDetails.email + '&token=' + verifyEmailToken)
                     .expect(200)
                     .expect(function() {
                         assert.lengthOf(verifyEmailTokenStore.tokens, 0);
@@ -384,9 +398,14 @@ describe('Registration', function() {
         function registerUserAndCaptureToken(done, callback) {
 
             var userDetails, verifyEmailToken;
-            fakeEmailService.sendRegistrationEmail = function(_userDetails, _verifyEmailToken, callback) {
+            fakeEmailService.sendRegistrationEmail = function(_userDetails, verifyQueryString, callback) {
                 userDetails = _.clone(_userDetails);
-                verifyEmailToken = _verifyEmailToken;
+
+                if (verifyQueryString) {
+                    // Note: verifyQueryString is of the form "?email=xxx&token=yyy"
+                    verifyEmailToken = verifyQueryString.substr(verifyQueryString.lastIndexOf('=') + 1);
+                }
+
                 callback(null);
             };
 

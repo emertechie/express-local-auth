@@ -199,7 +199,7 @@ describe('Forgot Password', function() {
 
     describe('Step 1 - Requesting Reset (when email verification required)', function() {
 
-        var forgotPasswordError;
+        var forgotPasswordErrors;
 
         beforeEach(function () {
             configureApp({
@@ -213,7 +213,7 @@ describe('Forgot Password', function() {
                 res.send('Password reset email sent to: ' + email);
             });
             app.get('/forgotpassword', function (req, res) {
-                forgotPasswordError = req.session.flash.error;
+                forgotPasswordErrors = req.flash('errors');
                 res.send('Dummy forgot password page');
             });
         });
@@ -233,7 +233,7 @@ describe('Forgot Password', function() {
 
                 utils.verifyPostRedirectGet(app, '/forgotpassword', postData, done, function verifyAfterGet() {
                     var expectedMsg = 'Please verify your email address first by clicking on the link in the registration email';
-                    assert.equal(forgotPasswordError, expectedMsg);
+                    assert.deepEqual(forgotPasswordErrors, [ expectedMsg ]);
                 });
             });
         });
@@ -270,7 +270,7 @@ describe('Forgot Password', function() {
     describe('Step 2 - Visiting Reset URL', function() {
 
         var passwordResetToken;
-        var resetPasswordValidationErrors, resetPasswordError;
+        var resetPasswordValidationErrors, resetPasswordErrors;
 
         beforeEach(function(done) {
             configureApp();
@@ -282,7 +282,7 @@ describe('Forgot Password', function() {
 
             app.get('/resetpassword', sentry.resetPasswordView(), function(req, res) {
                 resetPasswordValidationErrors = res.locals.validationErrors;
-                resetPasswordError = res.locals.error;
+                resetPasswordErrors = res.locals.errors;
                 res.send('Dummy reset password page with token: ' + req.query.token);
             });
 
@@ -347,7 +347,7 @@ describe('Forgot Password', function() {
                 .get('/resetpassword?email=' + existingUserEmail + '&token=' + token)
                 .expect(400)
                 .expect(function() {
-                    assert.equal(resetPasswordError, 'Unknown or expired token');
+                    assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
                 })
                 .end(done);
         });
@@ -361,7 +361,7 @@ describe('Forgot Password', function() {
                 .get('/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken)
                 .expect(400)
                 .expect(function() {
-                    assert.equal(resetPasswordError, 'Unknown or expired token');
+                    assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
                 })
                 .end(done);
         });
@@ -376,7 +376,7 @@ describe('Forgot Password', function() {
 
     describe('Step 3 - Resetting Password', function() {
 
-        var passwordResetToken, resetPasswordValidationErrors, resetPasswordError;
+        var passwordResetToken, resetPasswordValidationErrors, resetPasswordErrors;
 
         beforeEach(function(done) {
             configureApp();
@@ -387,8 +387,8 @@ describe('Forgot Password', function() {
             });
 
             app.get('/resetpassword', sentry.resetPasswordView(), function(req, res) {
-                resetPasswordValidationErrors = req.session.flash ? req.session.flash.validationErrors : null;
-                resetPasswordError = req.session.flash ? req.session.flash.error : null;
+                resetPasswordValidationErrors = req.flash ? req.flash('validationErrors') : null;
+                resetPasswordErrors = req.flash ? req.flash('errors') : null;
                 res.send('Dummy reset password page with token ' + req.query.token);
             });
 
@@ -505,7 +505,7 @@ describe('Forgot Password', function() {
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=unknown-token';
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
-                assert.equal(resetPasswordError, 'Unknown or expired token');
+                assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
             });
         });
 
@@ -518,7 +518,7 @@ describe('Forgot Password', function() {
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
-                assert.equal(resetPasswordError, 'Unknown or expired token');
+                assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
             });
         });
 
@@ -527,7 +527,7 @@ describe('Forgot Password', function() {
             var expectedRedirectPath = '/resetpassword?email=unknown-email@example.com&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
-                assert.equal(resetPasswordError, 'Unknown or expired token');
+                assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
             });
         });
 
@@ -540,7 +540,7 @@ describe('Forgot Password', function() {
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
             utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
-                assert.equal(resetPasswordError, 'Unknown or expired token');
+                assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
             });
         });
 

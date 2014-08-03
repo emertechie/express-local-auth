@@ -13,7 +13,7 @@ describe('Changing Password', function() {
 
     var app, userStore;
     var existingUserEmail, existingUserPassword;
-    var changePasswordValidationErrors, changePasswordError;
+    var changePasswordValidationErrors, changePasswordErrors;
 
     beforeEach(function(done) {
         // Set up app and sentry:
@@ -28,8 +28,8 @@ describe('Changing Password', function() {
             res.send(201);
         });
         app.get('/changepassword', function(req, res) {
-            changePasswordValidationErrors = req.session.flash ? req.session.flash.validationErrors : null;
-            changePasswordError = req.session.flash ? req.session.flash.error : null;
+            changePasswordValidationErrors = req.flash ? req.flash('validationErrors') : null;
+            changePasswordErrors = req.flash ? req.flash('errors') : null;
             res.send('dummy change password page');
         });
         app.post('/changepassword', sentry.changePassword(), function(req, res) {
@@ -133,7 +133,7 @@ describe('Changing Password', function() {
         var postData = { oldPassword: 'not-' + existingUserPassword, newPassword: 'new-pass', confirmNewPassword: 'new-pass' };
 
         utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
-            assert.equal(changePasswordError, 'Incorrect password');
+            assert.deepEqual(changePasswordErrors, ['Incorrect password']);
         });
     });
 

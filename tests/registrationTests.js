@@ -44,7 +44,7 @@ describe('Registration', function() {
 
     describe('User Registration', function() {
 
-        var registerValidationErrors, registerError;
+        var registerValidationErrors, registerErrors;
 
         beforeEach(function() {
             app = utils.configureExpress();
@@ -56,9 +56,8 @@ describe('Registration', function() {
                 // Normally something like: res.redirect('/home');
             });
             app.get('/register', function(req, res) {
-                // Capture values for test
-                registerValidationErrors = req.session.flash.validationErrors;
-                registerError = req.session.flash.error;
+                registerValidationErrors = req.flash('validationErrors');
+                registerErrors = req.flash('errors');
                 res.send(200, 'dummy register page');
             });
         });
@@ -155,7 +154,7 @@ describe('Registration', function() {
                 .expect(201)
                 .end(function() {
 
-                    assert.notOk(registerError, 'Unexpected error found');
+                    assert.lengthOf(registerErrors, 0);
 
                     request(app)
                         .post('/register')
@@ -172,7 +171,7 @@ describe('Registration', function() {
                                 .set('cookie', res.headers['set-cookie'])
                                 .expect(200)
                                 .expect(function() {
-                                    assert.equal(registerError, 'Registration details already in use', 'Error found');
+                                    assert.deepEqual(registerErrors, [ 'Registration details already in use' ], 'Error found');
                                 })
                                 .end(done);
                         });
@@ -238,7 +237,7 @@ describe('Registration', function() {
 
     describe('User Registration With Email Verification', function() {
 
-        var verifyEmailValidationErrors, verifyEmailError;
+        var verifyEmailValidationErrors, verifyEmailErrors;
 
         beforeEach(function() {
             app = utils.configureExpress();
@@ -256,7 +255,7 @@ describe('Registration', function() {
 
             app.get('/verifyemail', sentry.verifyEmailView(), function(req, res) {
                 verifyEmailValidationErrors = res.locals.validationErrors;
-                verifyEmailError = res.locals.error;
+                verifyEmailErrors = res.locals.errors;
                 res.send('dummy verify email page');
             });
         });
@@ -329,7 +328,7 @@ describe('Registration', function() {
                 .get('/verifyemail?token=unknown-token')
                 .expect(400)
                 .expect(function() {
-                    assert.equal(verifyEmailError, 'Unknown or invalid token')
+                    assert.deepEqual(verifyEmailErrors, [ 'Unknown or invalid token' ]);
                 })
                 .end(done);
         });
@@ -346,7 +345,7 @@ describe('Registration', function() {
                     .get('/verifyemail?token=' + verifyEmailToken)
                     .expect(400)
                     .expect(function() {
-                        assert.equal(verifyEmailError, 'Unknown or invalid token');
+                        assert.deepEqual(verifyEmailErrors, [ 'Unknown or invalid token' ]);
                     })
                     .end(done);
             });

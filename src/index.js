@@ -88,7 +88,7 @@ module.exports = function(options) {
                                 }
                                 if (userAlreadyExists) {
                                     logger.info('Registration details for user "%s" already exist', email);
-                                    return handleError(req, res, next, 'error', 'Registration details already in use', errorRedirect);
+                                    return handleError(req, res, next, 'errors', 'Registration details already in use', errorRedirect);
                                 }
 
                                 var sendRegEmailAndLogIn = function(verifyEmailToken) {
@@ -163,8 +163,8 @@ module.exports = function(options) {
                                         logger.info('Unknown user "%s" from verify email token "%s"', tokenDetails.email, token);
 
                                         res.status(400);
-                                        res.locals.error = 'Unknown or invalid token';
-                                        return next();
+                                        var useRedirect = false;
+                                        return handleError(req, res, next, 'errors', 'Unknown or invalid token', useRedirect);
                                     }
 
                                     user.emailVerified = true;
@@ -190,8 +190,8 @@ module.exports = function(options) {
                                 logger.info('Unknown verify email token "%s"', token);
 
                                 res.status(400);
-                                res.locals.error = 'Unknown or invalid token';
-                                next();
+                                var useRedirect = false;
+                                handleError(req, res, next, 'errors', 'Unknown or invalid token', useRedirect);
                             }
                         });
                     };
@@ -249,7 +249,7 @@ module.exports = function(options) {
 
                             if (options.verifyEmail && !user.emailVerified) {
                                 var errorMsg = 'Please verify your email address first by clicking on the link in the registration email';
-                                return handleError(req, res, next, 'error', errorMsg, errorRedirect);
+                                return handleError(req, res, next, 'errors', errorMsg, errorRedirect);
                             }
 
                             // Note: setting this in case next handler needs to know if user found
@@ -308,7 +308,7 @@ module.exports = function(options) {
                     return function changePasswordViewHandler(req, res, next) {
                         var hasTokenParam = 'token' in req.query;
                         var hasFlashErrors = (req.session && req.session.flash)
-                            ? req.session.flash.validationErrors || req.session.flash.error
+                            ? req.session.flash.validationErrors || req.session.flash.errors
                             : false;
 
                         if (!hasTokenParam || hasFlashErrors) {
@@ -338,7 +338,8 @@ module.exports = function(options) {
                                 logger.info('Invalid password reset token found for email "%s" while rendering password reset view', email);
 
                                 res.status(400);
-                                res.locals.error = 'Unknown or expired token';
+                                var useRedirect = false;
+                                return handleError(req, res, next, 'errors', 'Unknown or expired token', useRedirect);
                             }
 
                             next();
@@ -379,7 +380,7 @@ module.exports = function(options) {
 
                             if (!isValid) {
                                 logger.info('Invalid password reset token found for email "%s" in reset password handler', email);
-                                return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                                return handleError(req, res, next, 'errors', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
                             }
 
                             authService.hash(password, function(err, hashedPassword) {
@@ -395,7 +396,7 @@ module.exports = function(options) {
                                     }
                                     if (!user) {
                                         logger.info('Unknown user "%s" in reset password handler', email);
-                                        return handleError(req, res, next, 'error', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                                        return handleError(req, res, next, 'errors', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
                                     }
 
                                     user.hashedPassword = hashedPassword;
@@ -465,7 +466,7 @@ module.exports = function(options) {
 
                                 if (!passwordMatches) {
                                     logger.info('Incorrect old password for user "%s" in change password handler', email, err);
-                                    return handleError(req, res, next, 'error', 'Incorrect password', errorRedirect);
+                                    return handleError(req, res, next, 'errors', 'Incorrect password', errorRedirect);
                                 }
 
                                 authService.hash(req.body.newPassword, function(err, hashedPassword) {
@@ -535,7 +536,8 @@ module.exports = function(options) {
                     var redirectPath = getErrorRedirectPath(req, errorRedirect, redirectQueryParams);
                     res.redirect(redirectPath);
                 } else {
-                    res.locals[errorName] = error;
+                    // Note: Assigning an error array to match the format you get if using flash (so view logic stays the same either way)
+                    res.locals[errorName] = [ error ];
                     next();
                 }
             }

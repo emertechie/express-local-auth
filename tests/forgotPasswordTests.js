@@ -311,13 +311,13 @@ describe('Forgot Password', function() {
                 .get('/resetpassword?email=&token=' + passwordResetToken)
                 .expect(400)
                 .expect(function() {
-                    assert.deepEqual(resetPasswordValidationErrors, {
+                    assert.deepEqual(resetPasswordValidationErrors, [{
                         email: {
                             param: 'email',
                             msg: 'Email address required',
                             value: ''
                         }
-                    });
+                    }]);
                 })
                 .end(done);
         });
@@ -329,13 +329,13 @@ describe('Forgot Password', function() {
                 .get('/resetpassword?email=' + existingUserEmail + '&token=' + token)
                 .expect(400)
                 .expect(function() {
-                    assert.deepEqual(resetPasswordValidationErrors, {
+                    assert.deepEqual(resetPasswordValidationErrors, [{
                         token: {
                             param: 'token',
                             msg: 'Password reset token required',
                             value: ''
                         }
-                    });
+                    }]);
                 })
                 .end(done);
         });

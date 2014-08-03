@@ -147,10 +147,11 @@ module.exports = function(options) {
                     return function verifyEmailAddressHandler(req, res, next) {
                         req.checkQuery('email', 'Valid email address required').notEmpty().isEmail();
                         req.checkQuery('token', 'Verify email token required').notEmpty();
+                        // TODO: Use handleValidationErrors function for all this
                         var validationErrors = req.validationErrors(true);
                         if (validationErrors) {
                             res.status(400);
-                            res.locals.validationErrors = validationErrors;
+                            res.locals.validationErrors = [ validationErrors ];
                             return next();
                         }
 
@@ -330,10 +331,11 @@ module.exports = function(options) {
 
                         req.checkQuery('token', 'Password reset token required').notEmpty();
                         req.checkQuery('email', 'Email address required').notEmpty();
+                        // TODO: Use handleValidationErrors function for all this
                         var validationErrors = req.validationErrors(true);
                         if (validationErrors) {
                             res.status(400);
-                            res.locals.validationErrors = validationErrors;
+                            res.locals.validationErrors = [ validationErrors ];
                             return next();
                         }
 

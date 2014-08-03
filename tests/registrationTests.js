@@ -306,13 +306,13 @@ describe('Registration', function() {
                 .get('/verifyemail?token=foo&email=')
                 .expect(400)
                 .expect(function() {
-                    assert.deepEqual(verifyEmailValidationErrors, {
+                    assert.deepEqual(verifyEmailValidationErrors, [{
                         email: {
                             param: 'email',
                             msg: 'Valid email address required',
                             value: ''
                         }
-                    });
+                    }]);
                 })
                 .end(done);
         });
@@ -322,13 +322,13 @@ describe('Registration', function() {
                 .get('/verifyemail?email=foo@example.com&token=')
                 .expect(400)
                 .expect(function() {
-                    assert.deepEqual(verifyEmailValidationErrors, {
+                    assert.deepEqual(verifyEmailValidationErrors, [{
                         token: {
                             param: 'token',
                             msg: 'Verify email token required',
                             value: ''
                         }
-                    });
+                    }]);
                 })
                 .end(done);
         });

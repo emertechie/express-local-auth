@@ -230,7 +230,7 @@ module.exports = function(options) {
                                     return next(err);
                                 }
 
-                                logger.error('User "%s" successfully unregistered', email, err);
+                                logger.info('User "%s" successfully unregistered', email, err);
                                 next();
                             });
                         });

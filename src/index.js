@@ -58,7 +58,7 @@ module.exports = function(options) {
                         return;
                     }
 
-                    var email = req.body.email;
+                    var email = options.normalizeCase ? req.body.email.toLowerCase() : req.body.email;
                     var userDetails = {
                         email: email,
                         username: req.body.username || email,

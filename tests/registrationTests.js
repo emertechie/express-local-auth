@@ -127,6 +127,25 @@ describe('Registration', function() {
                 .end(done);
         });
 
+        it('should normalize the case of the email address when registering in order to avoid confusion', function(done) {
+            assert.lengthOf(userStore.users, 0);
+
+            request(app)
+                .post('/register')
+                .send({ username: 'foo', email: 'FOO@EXAMPLE.COM', password: 'bar'})
+                .expect(201)
+                .expect(function() {
+                    assert.lengthOf(userStore.users, 1);
+                    assert.deepEqual(userStore.users[0], {
+                        username: 'foo',
+                        email: 'foo@example.com',
+                        id: "User#1",
+                        hashedPassword: 'hashed-bar'
+                    });
+                })
+                .end(done);
+        });
+
         it('should use auth service to log user in after registration', function(done) {
             assert.lengthOf(userStore.users, 0);
 

@@ -8,7 +8,8 @@ module.exports = function(options) {
     options = _.defaults(options || {}, {
         tokenExpirationMins: 60,
         verifyEmail: false,
-        useSession: true
+        useSession: true,
+        normalizeCase: true
     });
 
     expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
@@ -150,7 +151,7 @@ module.exports = function(options) {
                         return next();
                     }
 
-                    var email = req.query.email;
+                    var email = options.normalizeCase ? req.query.email.toLowerCase() : req.query.email;
                     var token = req.query.token;
 
                     findAndVerifyRegistrationEmailToken(email, token, function(err, verified) {
@@ -246,7 +247,7 @@ module.exports = function(options) {
                         return;
                     }
 
-                    var email = req.body.email;
+                    var email = options.normalizeCase ? req.body.email.toLowerCase() : req.body.email;
 
                     userStore.findByEmail(email, function(err, user) {
                         if (err) {
@@ -335,7 +336,7 @@ module.exports = function(options) {
                     }
 
                     var token = req.query.token;
-                    var email = req.query.email;
+                    var email = options.normalizeCase ? req.query.email.toLowerCase() : req.query.email;
                     // Add these to locals so they can be rendered as hidden form inputs
                     res.locals.token = token;
                     res.locals.email = email;
@@ -381,7 +382,7 @@ module.exports = function(options) {
                     }
 
                     var token = req.body.token;
-                    var email = req.body.email;
+                    var email = options.normalizeCase ? req.body.email.toLowerCase() : req.body.email;
                     var password = req.body.password;
 
                     findAndVerifyPasswordResetToken(email, token, function(err, isValid, tokenDetails) {

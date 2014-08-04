@@ -98,6 +98,30 @@ describe('Forgot Password', function() {
             });
         });
 
+        it('ignores case of email when sending forgot password email', function(done) {
+            fakeEmailService.sendForgotPasswordEmail = sinon.stub().yields(null);
+
+            registerUser(existingUserEmail, existingUserPassword, function(err) {
+                if (err) {
+                    return done(err);
+                }
+
+                var uppercaseEmail = existingUserEmail.toUpperCase();
+
+                request(app)
+                    .post('/forgotpassword')
+                    .send({ email: uppercaseEmail })
+                    .expect(200)
+                    .expect(function() {
+                        var emailSentOk = fakeEmailService.sendForgotPasswordEmail.calledWith(
+                            sinon.match.has("email", existingUserEmail)
+                        );
+                        assert.isTrue(emailSentOk, 'Sends email');
+                    })
+                    .end(done);
+            });
+        });
+
         it('sends forgot password attempt notification email on entering unknown email', function(done) {
             fakeEmailService.sendForgotPasswordNotificationForUnregisteredEmail = sinon.stub().yields(null);
 
@@ -372,6 +396,14 @@ describe('Forgot Password', function() {
                 .expect(200, 'Dummy reset password page with token: ' + passwordResetToken)
                 .end(done);
         });
+
+        it('ignores case of email when rendering password reset response', function(done) {
+            var uppercaseEmail = existingUserEmail.toUpperCase();
+            request(app)
+                .get('/resetpassword?email=' + uppercaseEmail + '&token=' + passwordResetToken)
+                .expect(200, 'Dummy reset password page with token: ' + passwordResetToken)
+                .end(done);
+        });
     });
 
     describe('Step 3 - Resetting Password', function() {
@@ -551,6 +583,23 @@ describe('Forgot Password', function() {
             request(app)
                 .post('/resetpassword')
                 .send({ password: newPassword, confirmPassword: newPassword, token: passwordResetToken, email: existingUserEmail })
+                .expect(200, 'Password reset')
+                .expect(function() {
+                    assert.lengthOf(userStore.users, 1);
+                    var user = userStore.users[0];
+                    assert.equal(user.hashedPassword, 'hashed-' + newPassword);
+                })
+                .end(done);
+        });
+
+        it('ignores case of email when resetting password', function(done) {
+
+            var newPassword = existingUserPassword + '-new';
+            var uppercaseEmail = existingUserEmail.toUpperCase();
+
+            request(app)
+                .post('/resetpassword')
+                .send({ password: newPassword, confirmPassword: newPassword, token: passwordResetToken, email: uppercaseEmail })
                 .expect(200, 'Password reset')
                 .expect(function() {
                     assert.lengthOf(userStore.users, 1);

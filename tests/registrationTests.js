@@ -380,6 +380,23 @@ describe('Registration', function() {
             });
         });
 
+        it('ignores case of email address when verifying email address', function(done) {
+            assert.lengthOf(userStore.users, 0);
+
+            registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
+                var uppercaseEmail = userDetails.email.toUpperCase();
+
+                request(app)
+                    .get('/verifyemail?email=' + uppercaseEmail + '&token=' + verifyEmailToken)
+                    .expect(200)
+                    .expect(function() {
+                        assert.lengthOf(userStore.users, 1);
+                        assert.isTrue(userStore.users[0].emailVerified, 'Verified email');
+                    })
+                    .end(done);
+            });
+        });
+
         it('removes email verification token after use', function(done) {
             registerUserAndCaptureToken(done, function(verifyEmailToken, userDetails) {
 

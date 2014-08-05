@@ -61,8 +61,8 @@ module.exports = function(router, sharedServices, options) {
     var components = {};
     components.auth = auth(sharedServices, options);
 
-    // TODO: This is a smell. Only supporting options.authService for some tests
-    var authService = options.authService ? options.authService : components.auth.service;
+    // Note: Only supporting sharedServices.authService for some tests
+    var authService = sharedServices.authService ? sharedServices.authService : components.auth.service;
 
     components.registration = registration(sharedServices, authService, options);
     components.forgotPassword = forgotPassword(sharedServices, authService, options);

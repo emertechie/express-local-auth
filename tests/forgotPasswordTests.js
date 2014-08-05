@@ -3,7 +3,6 @@ var assert = require('chai').assert,
     FakeUserStore = require('./fakes/userStore'),
     FakeTokenStore = require('./fakes/tokenStore'),
     fakeEmailService = require('./fakes/fakeEmailService'),
-    fakeAuthService = require('./fakes/fakeAuthService'),
     utils = require('./utils'),
     _ = require('lodash'),
     sinon = require('sinon');
@@ -22,9 +21,12 @@ describe('Forgot Password', function() {
         passwordResetTokenStore = new FakeTokenStore();
 
         configureSentry = function(app, options) {
-            var verifyEmailTokenStore = new FakeTokenStore();
             // TODO
-            var results = utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
+            var results = utils.configureSentry(app, {
+                userStore: userStore,
+                passwordResetTokenStore: passwordResetTokenStore,
+                emailService: fakeEmailService
+            }, options);
             sentry = results.routeHandlers;
         };
 

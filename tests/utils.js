@@ -5,6 +5,10 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     cookieParser = require('cookie-parser'),
     _ = require('lodash'),
+    fakeEmailService = require('./fakes/fakeEmailService'),
+    fakeAuthService = require('./fakes/fakeAuthService'),
+    FakeUserStore = require('./fakes/userStore'),
+    FakeTokenStore = require('./fakes/tokenStore'),
     sentry = require('../src/index');
 
 module.exports = {
@@ -34,25 +38,26 @@ module.exports = {
 
         return app;
     },
-    configureSentry: function(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, emailService, authService, options) {
-        options = _.defaults(options || {}, {
-            authService: authService
-        });
+    configureSentry: function(app, services, options) {
 
         var noOpLogFn = function(format /*, args*/) {};
 
-        var services = {
-            userStore: userStore,
-            passwordResetTokenStore: passwordResetTokenStore,
-            verifyEmailTokenStore: verifyEmailTokenStore,
-            emailService: emailService,
+        services = _.defaults(services || {}, {
+            userStore: new FakeUserStore(),
+            verifyEmailTokenStore: new FakeTokenStore(),
+            passwordResetTokenStore: new FakeTokenStore(),
+            emailService: fakeEmailService,
             logger: {
                 debug: noOpLogFn,
                 info: noOpLogFn,
                 warn: noOpLogFn,
                 error: noOpLogFn
-            }
-        };
+            },
+            // Note: authService is only configured for tests. Normally internal auth service should be used
+            authService: fakeAuthService
+        });
+
+        options = options || {};
 
         return sentry(app, services, options);
     },

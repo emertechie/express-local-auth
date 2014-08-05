@@ -6,10 +6,7 @@ var express = require('express'),
     assert = require('chai').assert,
     request = require('supertest'),
     _ = require('lodash'),
-    fakeEmailService = require('./fakes/fakeEmailService'),
-    fakeAuthService = require('./fakes/fakeAuthService'),
     FakeUserStore = require('./fakes/userStore'),
-    FakeTokenStore = require('./fakes/tokenStore'),
     utils = require('./utils');
 
 var secondInMs = 1000 * 60;
@@ -61,10 +58,11 @@ describe('Forms-based Username and Password auth', function() {
         };
 
         configureSentry = function(app, options) {
-            var verifyEmailTokenStore = new FakeTokenStore();
-            var passwordResetTokenStore = new FakeTokenStore();
             // TODO
-            var results = utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
+            var results = utils.configureSentry(app, {
+                userStore: userStore
+            }, options);
+
             sentry = results.routeHandlers;
             authService = results.components.auth.service;
         };

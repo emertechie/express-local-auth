@@ -17,11 +17,13 @@ describe('Registration', function() {
         userStore = new FakeUserStore();
 
         configureSentry = function(app, options) {
-            var passwordResetTokenStore = new FakeTokenStore();
             verifyEmailTokenStore = new FakeTokenStore();
 
-            // TODO
-            var results =  utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
+            var results = utils.configureSentry(app, {
+                userStore: userStore,
+                emailService: fakeEmailService,
+                verifyEmailTokenStore: verifyEmailTokenStore
+            }, options);
             sentry = results.routeHandlers;
         };
 

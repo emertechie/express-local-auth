@@ -1,0 +1,25 @@
+extends ./shared/layout.jade
+
+block title
+    title Home
+
+block content
+    h1 Home Page
+    if newUser
+        p= 'Welcome new user ' + user.username
+    else
+        p= 'Welcome ' + user.username
+
+    if user.emailVerified === false
+        p Your email has not been verified
+    else if user.emailVerified
+        p Your email has been verified
+
+    p
+        a(href='/logout') Logout
+
+    p
+        a(href='/changepassword') Change Password
+
+    form(action='/unregister', method='POST')
+        button(type='submit') Delete Account

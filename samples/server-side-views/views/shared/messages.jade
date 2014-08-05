@@ -1,0 +1,9 @@
+mixin messages
+    - for (var i=0; i<errors.length; i++)
+        p.error= errors[i]
+    - for (var i=0; i<validationErrors.length; i++)
+        - for (var propName in validationErrors[i])
+            if (validationErrors[i].hasOwnProperty(propName))
+                p.error= validationErrors[i][propName].msg
+    - for (var i=0; i<successMsgs.length; i++)
+        p.success= successMsgs[i]

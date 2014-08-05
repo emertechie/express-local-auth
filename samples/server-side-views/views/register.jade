@@ -1,0 +1,15 @@
+extends ./shared/layout.jade
+
+block title
+    title Register
+
+block content
+    h1 Register
+    form(action='/register', method='post')
+        div
+            label(for='email') Email
+            input#email(type='text', name='email', value='user@example.com')
+        div
+            label(for='password') Password
+            input#password(type='password', name='password', value='pass')
+        button(type='submit') Register

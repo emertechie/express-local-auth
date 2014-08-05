@@ -1,0 +1,18 @@
+extends ./shared/layout.jade
+
+block title
+    if emailVerified
+        title Email Verified
+    else
+        title Email Not Verified
+
+block content
+    if emailVerified
+        h1 Email Verified
+        p Your email has been verified
+    else
+        h1 Email Not Verified
+        p There was a problem verifying your email
+
+    p
+        a(href='/home') home

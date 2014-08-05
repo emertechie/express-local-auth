@@ -8,7 +8,6 @@ module.exports = function(sharedServices, options) {
     var userStore = sharedServices.userStore;
     var logger = sharedServices.logger;
     var userIdGetter = sharedServices.userIdGetter;
-    var hashedPasswordGetter = sharedServices.hashedPasswordGetter;
 
     var authService = buildAuthService(userStore);
     configurePassport(userStore, authService);
@@ -110,8 +109,7 @@ module.exports = function(sharedServices, options) {
                     }
 
                     var verifyPassword = function () {
-                        var hashedPassword = hashedPasswordGetter(user);
-                        authService.verifyHash(password, hashedPassword, function (err, verifiied) {
+                        authService.verifyHash(password, user.hashedPassword, function (err, verifiied) {
                             if (err) {
                                 logger.error('Error verifying password hash for user "%s" in verify fn', user.email, err);
                                 return done(err);

@@ -13,10 +13,6 @@ module.exports = function(router, sharedServices, options) {
     sharedServices = _.defaults(sharedServices || {}, {
         userIdGetter: function(user) {
             return user.id;
-        },
-        // TODO: Get rid of this
-        hashedPasswordGetter: function(user) {
-            return user.hashedPassword;
         }
     });
 
@@ -40,9 +36,6 @@ module.exports = function(router, sharedServices, options) {
     }
     if (!sharedServices.userIdGetter) {
         throw new Error('Missing required userIdGetter service');
-    }
-    if (!sharedServices.hashedPasswordGetter) {
-        throw new Error('Missing required hashedPasswordGetter service');
     }
 
     options = _.defaults(options || {}, {

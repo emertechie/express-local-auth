@@ -9,8 +9,8 @@ var assert = require('chai').assert,
 
 describe('Forgot Password', function() {
 
-    var app, sentry, userStore, passwordResetTokenStore;
-    var configureApp, configureSentry, configureStandardRoutes;
+    var app, localAuth, userStore, passwordResetTokenStore;
+    var configureApp, configureLocalAuth, configureStandardRoutes;
     var existingUserEmail, existingUserPassword;
 
     beforeEach(function() {
@@ -20,8 +20,8 @@ describe('Forgot Password', function() {
         userStore = new FakeUserStore();
         passwordResetTokenStore = new FakeTokenStore();
 
-        configureSentry = function(app, options) {
-            sentry = utils.configureSentry(app, {
+        configureLocalAuth = function(app, options) {
+            localAuth = utils.configureLocalAuth(app, {
                 userStore: userStore,
                 passwordResetTokenStore: passwordResetTokenStore,
                 emailService: fakeEmailService
@@ -29,10 +29,10 @@ describe('Forgot Password', function() {
         };
 
         configureStandardRoutes = function(app) {
-            app.post('/register', sentry.register(), function(req, res) {
+            app.post('/register', localAuth.register(), function(req, res) {
                 res.send(201);
             });
-            app.post('/unregister', sentry.unregister(), function(req, res) {
+            app.post('/unregister', localAuth.unregister(), function(req, res) {
                 res.send('unregistered');
             });
         };
@@ -40,7 +40,7 @@ describe('Forgot Password', function() {
         configureApp = function(options) {
             options = options || {};
             app = utils.configureExpress();
-            configureSentry(app, options);
+            configureLocalAuth(app, options);
             configureStandardRoutes(app);
             return app;
         };
@@ -53,7 +53,7 @@ describe('Forgot Password', function() {
         beforeEach(function() {
             configureApp();
 
-            app.post('/forgotpassword', sentry.forgotPassword(), function(req, res) {
+            app.post('/forgotpassword', localAuth.forgotPassword(), function(req, res) {
                 var email = req.body.email;
                 res.send('Password reset email sent to: ' + email);
             });
@@ -231,7 +231,7 @@ describe('Forgot Password', function() {
                 verifyEmail: true
             });
 
-            app.post('/forgotpassword', sentry.forgotPassword(), function (req, res) {
+            app.post('/forgotpassword', localAuth.forgotPassword(), function (req, res) {
                 var email = req.body.email;
                 res.send('Password reset email sent to: ' + email);
             });
@@ -298,12 +298,12 @@ describe('Forgot Password', function() {
         beforeEach(function(done) {
             configureApp();
 
-            app.post('/forgotpassword', sentry.forgotPassword(), function(req, res) {
+            app.post('/forgotpassword', localAuth.forgotPassword(), function(req, res) {
                 var email = req.body.email;
                 res.send('Password reset email sent to: ' + email);
             });
 
-            app.get('/resetpassword', sentry.resetPasswordView(), function(req, res) {
+            app.get('/resetpassword', localAuth.resetPasswordView(), function(req, res) {
                 resetPasswordValidationErrors = res.locals.validationErrors;
                 resetPasswordErrors = res.locals.errors;
                 res.send('Dummy reset password page with token: ' + req.query.token);
@@ -412,18 +412,18 @@ describe('Forgot Password', function() {
         beforeEach(function(done) {
             configureApp();
 
-            app.post('/forgotpassword', sentry.forgotPassword(), function(req, res) {
+            app.post('/forgotpassword', localAuth.forgotPassword(), function(req, res) {
                 var email = req.body.email;
                 res.send('Password reset email sent to: ' + email);
             });
 
-            app.get('/resetpassword', sentry.resetPasswordView(), function(req, res) {
+            app.get('/resetpassword', localAuth.resetPasswordView(), function(req, res) {
                 resetPasswordValidationErrors = req.flash ? req.flash('validationErrors') : null;
                 resetPasswordErrors = req.flash ? req.flash('errors') : null;
                 res.send('Dummy reset password page with token ' + req.query.token);
             });
 
-            app.post('/resetpassword', sentry.resetPassword(), function(req, res) {
+            app.post('/resetpassword', localAuth.resetPassword(), function(req, res) {
                 res.send('Password reset');
             });
 

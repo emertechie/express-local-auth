@@ -14,8 +14,8 @@ var minuteInMs = secondInMs * 60;
 
 describe('Forms-based Username and Password auth', function() {
 
-    var configureExpress, configureSentry, configureStandardRoutes, configureApp;
-    var app, sentry, authService, userStore;
+    var configureExpress, configureLocalAuth, configureStandardRoutes, configureApp;
+    var app, localAuth, authService, userStore;
     var loginSuccessRedirectPath, logoutSuccessRedirectPath,
         existingUserEmail, existingUsername, existingUserPassword;
 
@@ -57,22 +57,21 @@ describe('Forms-based Username and Password auth', function() {
             return app;
         };
 
-        configureSentry = function(app, options) {
-            sentry = utils.configureSentry(app, {
+        configureLocalAuth = function(app, options) {
+            localAuth = utils.configureLocalAuth(app, {
                 userStore: userStore
             }, options);
-            authService = sentry.components.auth.service;
+            authService = localAuth.components.auth.service;
         };
 
         configureStandardRoutes = function(app) {
-            // app.get('/login', sentry.loginView());
             app.get('/login', function(req, res) {
                 res.send(200, 'dummy login page');
             });
-            app.post('/login', sentry.login(), function(req, res) {
+            app.post('/login', localAuth.login(), function(req, res) {
                 res.redirect(loginSuccessRedirectPath);
             });
-            app.get('/logout', sentry.logout(), function(req, res) {
+            app.get('/logout', localAuth.logout(), function(req, res) {
                 res.redirect(logoutSuccessRedirectPath);
             });
         };
@@ -81,7 +80,7 @@ describe('Forms-based Username and Password auth', function() {
             options = options || {};
             var useSession = (options.auth && 'useSession' in options.auth) ? options.auth.useSession : true;
             app = configureExpress();
-            configureSentry(app, options);
+            configureLocalAuth(app, options);
             configureStandardRoutes(app);
             return app;
         };
@@ -95,9 +94,9 @@ describe('Forms-based Username and Password auth', function() {
 
             beforeEach(function(done) {
                 app = configureExpress();
-                configureSentry(app);
+                configureLocalAuth(app);
 
-                app.post('/login', sentry.login(), function(req, res) {
+                app.post('/login', localAuth.login(), function(req, res) {
                     // Should have redirected before here on validation errors
                     res.redirect('/home');
                 });
@@ -172,11 +171,11 @@ describe('Forms-based Username and Password auth', function() {
 
             beforeEach(function(done) {
                 app = configureExpress();
-                configureSentry(app, {
+                configureLocalAuth(app, {
                     useSession: false
                 });
 
-                app.post('/login', sentry.login(), function(req, res) {
+                app.post('/login', localAuth.login(), function(req, res) {
                     loginValidationErrors = res.locals.validationErrors;
                     res.send(200);
                     // What you would probably do instead (locals.validationErrors accessible in view):
@@ -214,7 +213,7 @@ describe('Forms-based Username and Password auth', function() {
                 accountLockedMs = minuteInMs * 20;
 
                 app = configureExpress();
-                configureSentry(app, {
+                configureLocalAuth(app, {
                     failedLoginsBeforeLockout: failedLoginsBeforeLockout,
                     accountLockedMs: accountLockedMs
                 });
@@ -226,19 +225,19 @@ describe('Forms-based Username and Password auth', function() {
                 };
 
                 // Set up some standard routes and capture any login flash errors
-                app.post('/login', sentry.login(), function(req, res) {
+                app.post('/login', localAuth.login(), function(req, res) {
                     res.redirect(loginSuccessRedirectPath);
                 });
                 app.get('/login', function(req, res) {
                     loginErrors = req.flash('errors');
                     res.send(200, 'dummy login page');
                 });
-                app.get('/logout', sentry.logout(), function(req, res) {
+                app.get('/logout', localAuth.logout(), function(req, res) {
                     res.redirect(logoutSuccessRedirectPath);
                 });
 
                 // Set up couple of custom routes
-                app.get('/private', sentry.ensureAuthenticated(), function(req, res) {
+                app.get('/private', localAuth.ensureAuthenticated(), function(req, res) {
                     res.send(200, 'private stuff');
                 });
                 app.get('/public', function(req, res) {
@@ -540,22 +539,22 @@ describe('Forms-based Username and Password auth', function() {
 
             beforeEach(function(done) {
                 app = configureExpress();
-                configureSentry(app, {
+                configureLocalAuth(app, {
                     useSession: false
                 });
 
-                app.post('/login', sentry.login(), function(req, res) {
+                app.post('/login', localAuth.login(), function(req, res) {
                     loginErrors = res.locals.errors;
                     res.send(200);
                     // What you would probably do instead (locals.validationErrors accessible in view):
                     // res.render('login')
                 });
-                app.get('/logout', sentry.logout(), function(req, res) {
+                app.get('/logout', localAuth.logout(), function(req, res) {
                     res.redirect(logoutSuccessRedirectPath);
                 });
 
                 // Set up couple of custom routes
-                app.get('/private', sentry.ensureAuthenticated(), function(req, res) {
+                app.get('/private', localAuth.ensureAuthenticated(), function(req, res) {
                     res.send(200, 'private stuff');
                 });
                 app.get('/public', function(req, res) {
@@ -627,7 +626,7 @@ describe('Forms-based Username and Password auth', function() {
         beforeEach(function(done) {
             app = configureExpress();
 
-            configureSentry(app, {
+            configureLocalAuth(app, {
                 isAuthenticated: function(req, cb) {
                     // Test-code only. Don't do this!
                     var userId = req.headers['magic-token'];
@@ -644,14 +643,14 @@ describe('Forms-based Username and Password auth', function() {
             app.get('/login', function(req, res) {
                 res.send(200, 'Fake login view');
             });
-            app.post('/login', sentry.login(), function(req, res) {
+            app.post('/login', localAuth.login(), function(req, res) {
                 // Test-code only. Don't do this!
                 res.set('magic-token', req.user.id);
 
                 res.redirect(loginSuccessRedirectPath);
             });
 
-            app.get('/private', sentry.ensureAuthenticated(), function(req, res) {
+            app.get('/private', localAuth.ensureAuthenticated(), function(req, res) {
                 res.send(200, 'private stuff');
             });
 

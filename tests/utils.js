@@ -9,7 +9,7 @@ var express = require('express'),
     fakeAuthService = require('./fakes/fakeAuthService'),
     FakeUserStore = require('./fakes/userStore'),
     FakeTokenStore = require('./fakes/tokenStore'),
-    sentry = require('../src/index');
+    localAuthFactory = require('../src/index');
 
 module.exports = {
     configureExpress: function(options) {
@@ -38,7 +38,7 @@ module.exports = {
 
         return app;
     },
-    configureSentry: function(app, services, options) {
+    configureLocalAuth: function(app, services, options) {
 
         var noOpLogFn = function(format /*, args*/) {};
 
@@ -59,7 +59,7 @@ module.exports = {
 
         options = options || {};
 
-        return sentry(app, services, options);
+        return localAuthFactory(app, services, options);
     },
     verifyPostRedirectGet: function(app, path, sendData, /* opt: */ redirectPath, /* opt: */ options, verifyAfterGetFn, done) {
 

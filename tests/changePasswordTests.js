@@ -10,23 +10,23 @@ var assert = require('chai').assert,
 
 describe('Changing Password', function() {
 
-    var app, sentry, userStore;
+    var app, localAuth, userStore;
     var existingUserEmail, existingUserPassword;
     var changePasswordValidationErrors, changePasswordErrors;
 
     beforeEach(function(done) {
-        // Set up app and sentry:
+        // Set up app and localAuth:
         userStore = new FakeUserStore();
         app = utils.configureExpress();
 
-        sentry = utils.configureSentry(app, {
+        localAuth = utils.configureLocalAuth(app, {
             userStore: userStore,
             emailService: fakeEmailService,
             authService: fakeAuthService
         });
 
         // Register routes:
-        app.post('/register', sentry.register(), function(req, res) {
+        app.post('/register', localAuth.register(), function(req, res) {
             res.send(201);
         });
         app.get('/changepassword', function(req, res) {
@@ -34,7 +34,7 @@ describe('Changing Password', function() {
             changePasswordErrors = req.flash ? req.flash('errors') : null;
             res.send('dummy change password page');
         });
-        app.post('/changepassword', sentry.changePassword(), function(req, res) {
+        app.post('/changepassword', localAuth.changePassword(), function(req, res) {
             res.send('password changed');
         });
 

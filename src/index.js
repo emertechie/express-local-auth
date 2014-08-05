@@ -68,16 +68,16 @@ module.exports = function(router, sharedServices, options) {
     components.forgotPassword = forgotPassword(sharedServices, authService, options);
     components.changePassword = changePassword(sharedServices, authService, options);
 
-    var sentry = {
+    var localAuth = {
         components: components
     };
 
-    _.assign(sentry, components.auth.routeHandlers);
-    _.assign(sentry, components.registration.routeHandlers);
-    _.assign(sentry, components.forgotPassword.routeHandlers);
-    _.assign(sentry, components.changePassword.routeHandlers);
+    _.assign(localAuth, components.auth.routeHandlers);
+    _.assign(localAuth, components.registration.routeHandlers);
+    _.assign(localAuth, components.forgotPassword.routeHandlers);
+    _.assign(localAuth, components.changePassword.routeHandlers);
 
-    return sentry;
+    return localAuth;
 };
 
 function configureRouter(router, options) {

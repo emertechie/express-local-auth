@@ -10,16 +10,16 @@ var assert = require('chai').assert,
 
 describe('Registration', function() {
 
-    var app, sentry, userStore, verifyEmailTokenStore;
-    var configureApp, configureSentry, configureStandardRoutes;
+    var app, localAuth, userStore, verifyEmailTokenStore;
+    var configureApp, configureLocalAuth, configureStandardRoutes;
 
     beforeEach(function() {
         userStore = new FakeUserStore();
 
-        configureSentry = function(app, options) {
+        configureLocalAuth = function(app, options) {
             verifyEmailTokenStore = new FakeTokenStore();
 
-            sentry = utils.configureSentry(app, {
+            localAuth = utils.configureLocalAuth(app, {
                 userStore: userStore,
                 emailService: fakeEmailService,
                 verifyEmailTokenStore: verifyEmailTokenStore
@@ -27,10 +27,10 @@ describe('Registration', function() {
         };
 
         configureStandardRoutes = function(app) {
-            app.post('/register', sentry.register(), function(req, res) {
+            app.post('/register', localAuth.register(), function(req, res) {
                 res.send(201);
             });
-            app.post('/unregister', sentry.unregister(), function(req, res) {
+            app.post('/unregister', localAuth.unregister(), function(req, res) {
                 res.send(200, 'unregistered');
             });
         };
@@ -38,7 +38,7 @@ describe('Registration', function() {
         configureApp = function(options) {
             options = options || {};
             app = utils.configureExpress();
-            configureSentry(app, options);
+            configureLocalAuth(app, options);
             configureStandardRoutes(app);
             return app;
         };
@@ -50,9 +50,9 @@ describe('Registration', function() {
 
         beforeEach(function() {
             app = utils.configureExpress();
-            configureSentry(app);
+            configureLocalAuth(app);
 
-            app.post('/register', sentry.register(), function(req, res) {
+            app.post('/register', localAuth.register(), function(req, res) {
                 // Should have redirected before here on errors
                 res.send(201);
                 // Normally something like: res.redirect('/home');
@@ -262,17 +262,17 @@ describe('Registration', function() {
 
         beforeEach(function() {
             app = utils.configureExpress();
-            configureSentry(app, {
+            configureLocalAuth(app, {
                 verifyEmail: true
             });
 
-            app.post('/register', sentry.register(), function (req, res) {
+            app.post('/register', localAuth.register(), function (req, res) {
                 // Should have redirected before here on errors
                 res.send(201);
                 // Normally something like: res.redirect('/home');
             });
 
-            app.get('/verifyemail', sentry.verifyEmailView(), function(req, res) {
+            app.get('/verifyemail', localAuth.verifyEmailView(), function(req, res) {
                 verifyEmailValidationErrors = res.locals.validationErrors;
                 verifyEmailErrors = res.locals.errors;
                 res.send('dummy verify email page');

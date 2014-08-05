@@ -68,16 +68,16 @@ module.exports = function(router, sharedServices, options) {
     components.forgotPassword = forgotPassword(sharedServices, authService, options);
     components.changePassword = changePassword(sharedServices, authService, options);
 
-    var routeHanlders = {};
-    _.assign(routeHanlders, components.auth.routeHandlers);
-    _.assign(routeHanlders, components.registration.routeHandlers);
-    _.assign(routeHanlders, components.forgotPassword.routeHandlers);
-    _.assign(routeHanlders, components.changePassword.routeHandlers);
-
-    return {
-        components: components,
-        routeHandlers: routeHanlders
+    var sentry = {
+        components: components
     };
+
+    _.assign(sentry, components.auth.routeHandlers);
+    _.assign(sentry, components.registration.routeHandlers);
+    _.assign(sentry, components.forgotPassword.routeHandlers);
+    _.assign(sentry, components.changePassword.routeHandlers);
+
+    return sentry;
 };
 
 function configureRouter(router, options) {

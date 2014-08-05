@@ -58,13 +58,10 @@ describe('Forms-based Username and Password auth', function() {
         };
 
         configureSentry = function(app, options) {
-            // TODO
-            var results = utils.configureSentry(app, {
+            sentry = utils.configureSentry(app, {
                 userStore: userStore
             }, options);
-
-            sentry = results.routeHandlers;
-            authService = results.components.auth.service;
+            authService = sentry.components.auth.service;
         };
 
         configureStandardRoutes = function(app) {

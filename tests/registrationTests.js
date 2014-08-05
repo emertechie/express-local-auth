@@ -19,12 +19,11 @@ describe('Registration', function() {
         configureSentry = function(app, options) {
             verifyEmailTokenStore = new FakeTokenStore();
 
-            var results = utils.configureSentry(app, {
+            sentry = utils.configureSentry(app, {
                 userStore: userStore,
                 emailService: fakeEmailService,
                 verifyEmailTokenStore: verifyEmailTokenStore
             }, options);
-            sentry = results.routeHandlers;
         };
 
         configureStandardRoutes = function(app) {

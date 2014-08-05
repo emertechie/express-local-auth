@@ -19,13 +19,11 @@ describe('Changing Password', function() {
         userStore = new FakeUserStore();
         app = utils.configureExpress();
 
-        // TODO
-        var results = utils.configureSentry(app, {
+        sentry = utils.configureSentry(app, {
             userStore: userStore,
             emailService: fakeEmailService,
             authService: fakeAuthService
         });
-        sentry = results.routeHandlers;
 
         // Register routes:
         app.post('/register', sentry.register(), function(req, res) {

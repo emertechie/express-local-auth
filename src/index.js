@@ -54,7 +54,7 @@ module.exports = function(options) {
                 return function registerHandler(req, res, next) {
                     req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                     req.checkBody('password', 'Password required').notEmpty();
-                    if (handleValidationErrors(req, res, next, errorRedirect)) {
+                    if (handleValidationErrors(errorRedirect)(req, res, next)) {
                         return;
                     }
 
@@ -84,7 +84,7 @@ module.exports = function(options) {
                             }
                             if (userAlreadyExists) {
                                 logger.info('Registration details for user "%s" already exist', email);
-                                return handleError(req, res, next, 'errors', 'Registration details already in use', errorRedirect);
+                                return handleError('Registration details already in use', errorRedirect, 409)(req, res, next);
                             }
 
                             var sendRegEmailAndLogIn = function(verifyQueryString) {
@@ -143,12 +143,9 @@ module.exports = function(options) {
                 return function verifyEmailAddressHandler(req, res, next) {
                     req.checkQuery('email', 'Valid email address required').notEmpty().isEmail();
                     req.checkQuery('token', 'Verify email token required').notEmpty();
-                    // TODO: Use handleValidationErrors function for all this
-                    var validationErrors = req.validationErrors(true);
-                    if (validationErrors) {
-                        res.status(400);
-                        res.locals.validationErrors = [ validationErrors ];
-                        return next();
+                    var errorRedirect = false;
+                    if (handleValidationErrors(errorRedirect)(req, res, next)) {
+                        return;
                     }
 
                     var email = options.normalizeCase ? req.query.email.toLowerCase() : req.query.email;
@@ -169,10 +166,8 @@ module.exports = function(options) {
 
                                 if (!user) {
                                     logger.info('Unknown user "%s" for verify email token "%s"', email, token);
-
-                                    res.status(400);
                                     var useRedirect = false;
-                                    return handleError(req, res, next, 'errors', 'Unknown or invalid token', useRedirect);
+                                    return handleError('Unknown or invalid token', useRedirect, 400)(req, res, next);
                                 }
 
                                 user.emailVerified = true;
@@ -196,10 +191,8 @@ module.exports = function(options) {
                             });
                         } else {
                             logger.info('Unknown or invalid verify email token "%s" for email "%s"', token, email);
-
-                            res.status(400);
                             var useRedirect = false;
-                            handleError(req, res, next, 'errors', 'Unknown or invalid token', useRedirect);
+                            handleError('Unknown or invalid token', useRedirect, 400)(req, res, next);
                         }
                     });
                 };
@@ -243,7 +236,7 @@ module.exports = function(options) {
 
                 return function forgotPasswordHandler(req, res, next) {
                     req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
-                    if (handleValidationErrors(req, res, next, errorRedirect)) {
+                    if (handleValidationErrors(errorRedirect)(req, res, next)) {
                         return;
                     }
 
@@ -262,7 +255,7 @@ module.exports = function(options) {
                         if (user) {
                             if (options.verifyEmail && !user.emailVerified) {
                                 var errorMsg = 'Please verify your email address first by clicking on the link in the registration email';
-                                return handleError(req, res, next, 'errors', errorMsg, errorRedirect);
+                                return handleError(errorMsg, errorRedirect, 400)(req, res, next);
                             }
 
                             var unhashedToken = uuid.v4().replace(/-/g, '');
@@ -327,12 +320,9 @@ module.exports = function(options) {
 
                     req.checkQuery('token', 'Password reset token required').notEmpty();
                     req.checkQuery('email', 'Email address required').notEmpty();
-                    // TODO: Use handleValidationErrors function for all this
-                    var validationErrors = req.validationErrors(true);
-                    if (validationErrors) {
-                        res.status(400);
-                        res.locals.validationErrors = [ validationErrors ];
-                        return next();
+                    var errorRedirect = false;
+                    if (handleValidationErrors(errorRedirect)(req, res, next)) {
+                        return;
                     }
 
                     var token = req.query.token;
@@ -349,10 +339,8 @@ module.exports = function(options) {
 
                         if (!isValid) {
                             logger.info('Invalid password reset token found for email "%s" while rendering password reset view', email);
-
-                            res.status(400);
                             var useRedirect = false;
-                            return handleError(req, res, next, 'errors', 'Unknown or expired token', useRedirect);
+                            return handleError('Unknown or expired token', useRedirect, 400)(req, res, next);
                         }
 
                         next();
@@ -371,13 +359,13 @@ module.exports = function(options) {
 
                     var errorRedirectQueryParams = '?email=' + (req.body.email || '') + '&token=' + (req.body.token || '');
 
-                    if (handleValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                    if (handleValidationErrors(errorRedirect, errorRedirectQueryParams)(req, res, next)) {
                         return;
                     }
 
                     // Only check confirm password after we know others are ok to avoid returning a redundant error
                     req.checkBody('confirmPassword', 'Password and confirm password do not match').matches('password', req);
-                    if (handleValidationErrors(req, res, next, errorRedirect, errorRedirectQueryParams)) {
+                    if (handleValidationErrors(errorRedirect, errorRedirectQueryParams)(req, res, next)) {
                         return;
                     }
 
@@ -393,7 +381,7 @@ module.exports = function(options) {
 
                         if (!isValid) {
                             logger.info('Invalid password reset token found for email "%s" in reset password handler', email);
-                            return handleError(req, res, next, 'errors', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                            return handleError('Unknown or expired token', errorRedirect, errorRedirectQueryParams, 400)(req, res, next);
                         }
 
                         authService.hash(password, function(err, hashedPassword) {
@@ -409,7 +397,7 @@ module.exports = function(options) {
                                 }
                                 if (!user) {
                                     logger.info('Unknown user "%s" in reset password handler', email);
-                                    return handleError(req, res, next, 'errors', 'Unknown or expired token', errorRedirect, errorRedirectQueryParams);
+                                    return handleError('Unknown or expired token', errorRedirect, errorRedirectQueryParams, 400)(req, res, next);
                                 }
 
                                 user.hashedPassword = hashedPassword;
@@ -461,13 +449,13 @@ module.exports = function(options) {
                         req.checkBody('oldPassword', 'Old password required').notEmpty();
                         req.checkBody('newPassword', 'New password required').notEmpty();
                         req.checkBody('confirmNewPassword', 'New password confirmation required').notEmpty();
-                        if (handleValidationErrors(req, res, next, errorRedirect)) {
+                        if (handleValidationErrors(errorRedirect)(req, res, next)) {
                             return;
                         }
 
                         // Only check confirm password after we know others are ok to avoid returning a redundant error
                         req.checkBody('confirmNewPassword', 'New password and confirm password do not match').matches('newPassword', req);
-                        if (handleValidationErrors(req, res, next, errorRedirect)) {
+                        if (handleValidationErrors(errorRedirect)(req, res, next)) {
                             return;
                         }
 
@@ -479,7 +467,7 @@ module.exports = function(options) {
 
                             if (!passwordMatches) {
                                 logger.info('Incorrect old password for user "%s" in change password handler', email, err);
-                                return handleError(req, res, next, 'errors', 'Incorrect password', errorRedirect);
+                                return handleError('Incorrect password', errorRedirect, 401)(req, res, next);
                             }
 
                             authService.hash(req.body.newPassword, function(err, hashedPassword) {
@@ -562,30 +550,46 @@ module.exports = function(options) {
             });
         }
 
-        function handleValidationErrors(req, res, next, validationRedirect, redirectQueryParams) {
-            var validationErrors = req.validationErrors(true);
-            if (validationErrors) {
-                handleError(req, res, next, 'validationErrors', validationErrors, validationRedirect, redirectQueryParams);
-                return true;
-            }
-        }
-
-        function handleError(req, res, next, errorName, error, errorRedirect, redirectQueryParams) {
-            if (errorRedirect) {
-                req.flash(errorName, error);
-                var redirectPath = getErrorRedirectPath(req, errorRedirect, redirectQueryParams);
-                res.redirect(redirectPath);
-            } else {
-                // Note: Assigning an error array to match the format you get if using flash (so view logic stays the same either way)
-                res.locals[errorName] = [ error ];
-                next();
-            }
-        }
-
         function getErrorRedirectOption(routeOptions, useSession) {
             return routeOptions.errorRedirect === false
                 ? false
                 : routeOptions.errorRedirect || useSession;
+        }
+
+        function handleValidationErrors(validationRedirect, redirectQueryParams) {
+            return function(req, res, next) {
+                var validationErrors = req.validationErrors(true);
+                if (validationErrors) {
+                    errorHandler('validationErrors', validationErrors, validationRedirect, redirectQueryParams, 400)(req, res, next);
+                    return true;
+                }
+            };
+        }
+
+        function handleError(error, errorRedirect, redirectQueryParams, nonRedirectStatusCode) {
+            return errorHandler('errors', error, errorRedirect, redirectQueryParams, nonRedirectStatusCode);
+        }
+
+        // Supports session-based error handling (redirects with flash) and session-less error handling (status code and errors in locals)
+        function errorHandler(errorName, error, errorRedirect, /* opt: */ redirectQueryParams, nonRedirectStatusCode) {
+            if (typeof redirectQueryParams === 'number') {
+                nonRedirectStatusCode = redirectQueryParams;
+                redirectQueryParams = null;
+            }
+            nonRedirectStatusCode = nonRedirectStatusCode || 400;
+
+            return function(req, res, next) {
+                if (errorRedirect) {
+                    req.flash(errorName, error);
+                    var redirectPath = getErrorRedirectPath(req, errorRedirect, redirectQueryParams);
+                    res.redirect(redirectPath);
+                } else {
+                    res.status(nonRedirectStatusCode);
+                    // Note: Assigning an error array to match the format you get if using flash (so view logic stays the same either way)
+                    res.locals[errorName] = [ error ];
+                    next();
+                }
+            };
         }
 
         function getErrorRedirectPath(req, errorRedirect, redirectQueryParams) {

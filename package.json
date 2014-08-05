@@ -24,7 +24,10 @@
     "lodash": "~2.4.1",
     "express-validator": "~2.3.0",
     "node-uuid": "~1.4.1",
-    "async": "~0.9.0"
+    "async": "~0.9.0",
+    "passport-local": "~1.0.0",
+    "passport": "~0.2.0",
+    "bcrypt": "~0.8.0"
   },
   "devDependencies": {
     "body-parser": "~1.4.3",

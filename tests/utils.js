@@ -5,8 +5,7 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     cookieParser = require('cookie-parser'),
     _ = require('lodash'),
-    sentry = require('sentry'),
-    sentryRegistration = require('../src/index');
+    sentry = require('../src/index');
 
 module.exports = {
     configureExpress: function(options) {
@@ -36,31 +35,26 @@ module.exports = {
         return app;
     },
     configureSentry: function(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, emailService, authService, options) {
-        options = options || {};
+        options = _.defaults(options || {}, {
+            authService: authService
+        });
 
         var noOpLogFn = function(format /*, args*/) {};
 
-        var sentryOptions = _.defaults(options.sentry || {}, {
+        var services = {
             userStore: userStore,
             passwordResetTokenStore: passwordResetTokenStore,
             verifyEmailTokenStore: verifyEmailTokenStore,
             emailService: emailService,
-            auth: function() {
-                return {
-                    service: authService,
-                    routeHandlers: {}
-                }
-            },
-            registration: sentryRegistration(options.registration),
             logger: {
                 debug: noOpLogFn,
                 info: noOpLogFn,
                 warn: noOpLogFn,
                 error: noOpLogFn
             }
-        });
+        };
 
-        sentry.initialize(app, sentryOptions);
+        return sentry(app, services, options);
     },
     verifyPostRedirectGet: function(app, path, sendData, /* opt: */ redirectPath, /* opt: */ options, verifyAfterGetFn, done) {
 

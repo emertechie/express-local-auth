@@ -6,12 +6,11 @@ var assert = require('chai').assert,
     fakeAuthService = require('./fakes/fakeAuthService'),
     utils = require('./utils'),
     _ = require('lodash'),
-    sinon = require('sinon'),
-    sentry = require('sentry');
+    sinon = require('sinon');
 
 describe('Changing Password', function() {
 
-    var app, userStore;
+    var app, sentry, userStore;
     var existingUserEmail, existingUserPassword;
     var changePasswordValidationErrors, changePasswordErrors;
 
@@ -21,7 +20,9 @@ describe('Changing Password', function() {
         app = utils.configureExpress();
         var verifyEmailTokenStore = new FakeTokenStore();
         var passwordResetTokenStore = new FakeTokenStore();
-        utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService);
+        // TODO
+        var results = utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService);
+        sentry = results.routeHandlers;
 
         // Register routes:
         app.post('/register', sentry.register(), function(req, res) {

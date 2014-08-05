@@ -6,12 +6,11 @@ var assert = require('chai').assert,
     fakeAuthService = require('./fakes/fakeAuthService'),
     utils = require('./utils'),
     _ = require('lodash'),
-    sinon = require('sinon'),
-    sentry = require('sentry');
+    sinon = require('sinon');
 
 describe('Forgot Password', function() {
 
-    var app, userStore, passwordResetTokenStore;
+    var app, sentry, userStore, passwordResetTokenStore;
     var configureApp, configureSentry, configureStandardRoutes;
     var existingUserEmail, existingUserPassword;
 
@@ -24,7 +23,9 @@ describe('Forgot Password', function() {
 
         configureSentry = function(app, options) {
             var verifyEmailTokenStore = new FakeTokenStore();
-            utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
+            // TODO
+            var results = utils.configureSentry(app, userStore, passwordResetTokenStore, verifyEmailTokenStore, fakeEmailService, fakeAuthService, options);
+            sentry = results.routeHandlers;
         };
 
         configureStandardRoutes = function(app) {
@@ -227,9 +228,7 @@ describe('Forgot Password', function() {
 
         beforeEach(function () {
             configureApp({
-                registration: {
-                    verifyEmail: true
-                }
+                verifyEmail: true
             });
 
             app.post('/forgotpassword', sentry.forgotPassword(), function (req, res) {

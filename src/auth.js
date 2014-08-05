@@ -1,56 +1,17 @@
 var passport = require('passport'),
     LocalStrategy = require('passport-local').Strategy,
     bcrypt = require('bcrypt'),
-    expressValidator = require('express-validator'),
     _ = require('lodash'),
     utils = require('./utils');
 
-module.exports = function(router, sharedServices, options) {
-    /*if (!router) {
-        throw new Error('Missing required router parameter');
-    }
-    if (!sharedServices) {
-        throw new Error('Missing required configuration parameter');
-    }
-    if (!sharedServices.logger) {
-        throw new Error('Missing required logger service');
-    }
-    if (!sharedServices.userStore) {
-        throw new Error('Missing required userStore service');
-    }
-    if (!sharedServices.userIdGetter) {
-        throw new Error('Missing required userIdGetter service');
-    }
-    if (!sharedServices.hashedPasswordGetter) {
-        throw new Error('Missing required hashedPasswordGetter service');
-    }
-    */
-
+module.exports = function(sharedServices, options) {
     var userStore = sharedServices.userStore;
     var logger = sharedServices.logger;
     var userIdGetter = sharedServices.userIdGetter;
     var hashedPasswordGetter = sharedServices.hashedPasswordGetter;
 
-    /*options = _.defaults(options || {}, {
-        loginPath: '/login',
-        loginView: 'login',
-        useSession: true,
-        normalizeCase: true,
-        failedLoginsBeforeLockout: 10,
-        accountLockedMs: 20 * minuteInMs,
-        isAuthenticated: function (req, cb) {
-            return cb(null, req.isAuthenticated() ? req.user : false);
-        }
-    });*/
-
     var authService = buildAuthService(userStore);
     configurePassport(userStore, authService);
-
-    router.use(passport.initialize());
-    router.use(expressValidator());
-    if (options.useSession) {
-        router.use(passport.session());
-    }
 
     return {
         routeHandlers: buildRouteHandlers(authService),

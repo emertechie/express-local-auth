@@ -1,57 +1,13 @@
-var expressValidator = require('express-validator'),
-    _ = require('lodash'),
+var _ = require('lodash'),
     uuid = require('node-uuid'),
-    async = require('async'),
     utils = require('./utils');
 
-// TODO: remove router
-module.exports = function(router, sharedServices, authService, options) {
-    /*if (!router) {
-        throw new Error('Missing required router parameter');
-    }
-    if (!sharedServices) {
-        throw new Error('Missing required configuration parameter');
-    }
-    if (!sharedServices.logger) {
-        throw new Error('Missing required logger service');
-    }
-    if (!sharedServices.userStore) {
-        throw new Error('Missing required userStore service');
-    }
-    if (!sharedServices.emailService) {
-        throw new Error('Missing required emailService service');
-    }
-    if (!authService) {
-        throw new Error('Missing required authService parameter');
-    }
-    if (!sharedServices.userIdGetter) {
-        throw new Error('Missing required userIdGetter service');
-    }
-
-    options = _.defaults(options || {}, {
-        tokenExpirationMins: 60,
-        verifyEmail: false,
-        useSession: true,
-        normalizeCase: true
-    });
-
-    if (options.verifyEmail && !sharedServices.verifyEmailTokenStore) {
-        throw new Error('Missing required verifyEmailTokenStore service');
-    }
-    */
-
+module.exports = function(sharedServices, authService, options) {
     var userStore = sharedServices.userStore;
     var verifyEmailTokenStore = sharedServices.verifyEmailTokenStore;
     var emailService = sharedServices.emailService;
     var logger = sharedServices.logger;
     var userIdGetter = sharedServices.userIdGetter;
-
-    expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
-        var valueToMatch = req.param(expectedMatchParam);
-        return str === valueToMatch;
-    });
-
-    router.use(expressValidator());
 
     var routeHandlers = {
         register: function (routeOptions) {

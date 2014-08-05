@@ -1,4 +1,6 @@
 var _ = require('lodash'),
+    expressValidator = require('express-validator'),
+    passport = require('passport'),
     auth = require('./auth'),
     registration = require('./registration'),
     forgotPassword = require('./forgotPassword'),
@@ -61,15 +63,17 @@ module.exports = function(router, sharedServices, options) {
         throw new Error('Missing required verifyEmailTokenStore service');
     }
 
+    configureRouter(router, options);
+
     var components = {};
-    components.auth = auth(router, sharedServices, options);
+    components.auth = auth(sharedServices, options);
 
     // TODO: This is a smell. Only supporting options.authService for some tests
     var authService = options.authService ? options.authService : components.auth.service;
 
-    components.registration = registration(router, sharedServices, authService, options);
-    components.forgotPassword = forgotPassword(router, sharedServices, authService, options);
-    components.changePassword = changePassword(router, sharedServices, authService, options);
+    components.registration = registration(sharedServices, authService, options);
+    components.forgotPassword = forgotPassword(sharedServices, authService, options);
+    components.changePassword = changePassword(sharedServices, authService, options);
 
     var routeHanlders = {};
     _.assign(routeHanlders, components.auth.routeHandlers);
@@ -82,3 +86,17 @@ module.exports = function(router, sharedServices, options) {
         routeHandlers: routeHanlders
     };
 };
+
+function configureRouter(router, options) {
+    router.use(passport.initialize());
+
+    if (options.useSession) {
+        router.use(passport.session());
+    }
+
+    expressValidator.validator.extend('matches', function (str, expectedMatchParam, req) {
+        var valueToMatch = req.param(expectedMatchParam);
+        return str === valueToMatch;
+    });
+    router.use(expressValidator());
+}

@@ -1,52 +1,14 @@
-var expressValidator = require('express-validator'),
-    _ = require('lodash'),
+var _ = require('lodash'),
     uuid = require('node-uuid'),
     async = require('async'),
     utils = require('./utils');
 
-// TODO: remove router
-module.exports = function(router, sharedServices, authService, options) {
-    /*if (!router) {
-        throw new Error('Missing required router parameter');
-    }
-    if (!sharedServices) {
-        throw new Error('Missing required configuration parameter');
-    }
-    if (!sharedServices.logger) {
-        throw new Error('Missing required logger config');
-    }
-    if (!sharedServices.userStore) {
-        throw new Error('Missing required userStore config');
-    }
-    if (!sharedServices.passwordResetTokenStore) {
-        throw new Error('Missing required passwordResetTokenStore config');
-    }
-    if (!sharedServices.emailService) {
-        throw new Error('Missing required emailService config');
-    }
-    if (!sharedServices.userIdGetter) {
-        throw new Error('Missing required userIdGetter service');
-    }*/
-
+module.exports = function(sharedServices, authService, options) {
     var userStore = sharedServices.userStore;
     var passwordResetTokenStore = sharedServices.passwordResetTokenStore;
     var emailService = sharedServices.emailService;
     var logger = sharedServices.logger;
     var userIdGetter = sharedServices.userIdGetter;
-
-    /*options = _.defaults(options || {}, {
-        tokenExpirationMins: 60,
-        verifyEmail: false,
-        useSession: true,
-        normalizeCase: true
-    });*/
-
-    expressValidator.validator.extend('matches', function(str, expectedMatchParam, req) {
-        var valueToMatch = req.param(expectedMatchParam);
-        return str === valueToMatch;
-    });
-
-    router.use(expressValidator());
 
     var routeHandlers = {
         forgotPassword: function(routeOptions) {

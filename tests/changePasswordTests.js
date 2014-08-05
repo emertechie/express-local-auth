@@ -76,7 +76,7 @@ describe('Changing Password', function() {
     it('requires existing password', function(done) {
         var postData = { oldPassword: '', newPassword: 'new-pass', confirmNewPassword: 'new-pass' };
 
-        utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
+        utils.verifyPostRedirectGet(app, '/changepassword', postData, function() {
             assert.deepEqual(changePasswordValidationErrors, [{
                 oldPassword: {
                     param: 'oldPassword',
@@ -84,13 +84,13 @@ describe('Changing Password', function() {
                     value: ''
                 }
             }]);
-        });
+        }, done);
     });
 
     it('requires new password', function(done) {
         var postData = { oldPassword: existingUserPassword, newPassword: '', confirmNewPassword: 'new-pass' };
 
-        utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
+        utils.verifyPostRedirectGet(app, '/changepassword', postData, function() {
             assert.deepEqual(changePasswordValidationErrors, [{
                 newPassword: {
                     param: 'newPassword',
@@ -98,13 +98,13 @@ describe('Changing Password', function() {
                     value: ''
                 }
             }]);
-        });
+        }, done);
     });
 
     it('requires new password confirmation', function(done) {
         var postData = { oldPassword: existingUserPassword, newPassword: 'new-pass', confirmNewPassword: '' };
 
-        utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
+        utils.verifyPostRedirectGet(app, '/changepassword', postData, function() {
             assert.deepEqual(changePasswordValidationErrors, [{
                 confirmNewPassword: {
                     param: 'confirmNewPassword',
@@ -112,13 +112,13 @@ describe('Changing Password', function() {
                     value: ''
                 }
             }]);
-        });
+        }, done);
     });
 
     it('ensures new password and new password confirmation match', function(done) {
         var postData = { oldPassword: existingUserPassword, newPassword: 'new-pass', confirmNewPassword: 'not-new-pass' };
 
-        utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
+        utils.verifyPostRedirectGet(app, '/changepassword', postData, function() {
             assert.deepEqual(changePasswordValidationErrors, [{
                 confirmNewPassword: {
                     param: 'confirmNewPassword',
@@ -126,15 +126,15 @@ describe('Changing Password', function() {
                     value: 'not-new-pass'
                 }
             }]);
-        });
+        }, done);
     });
 
     it('forbids password change given incorrect existing password', function(done) {
         var postData = { oldPassword: 'not-' + existingUserPassword, newPassword: 'new-pass', confirmNewPassword: 'new-pass' };
 
-        utils.verifyPostRedirectGet(app, '/changepassword', postData, done, function() {
+        utils.verifyPostRedirectGet(app, '/changepassword', postData, function() {
             assert.deepEqual(changePasswordErrors, ['Incorrect password']);
-        });
+        }, done);
     });
 
     it('allows changing password given correct existing password', function(done) {

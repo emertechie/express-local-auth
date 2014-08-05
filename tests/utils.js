@@ -62,15 +62,32 @@ module.exports = {
 
         sentry.initialize(app, sentryOptions);
     },
-    verifyPostRedirectGet: function(app, path, sendData, redirectPath, done, verifyAfterGetFn, options) {
-        options = options || {};
+    verifyPostRedirectGet: function(app, path, sendData, /* opt: */ redirectPath, /* opt: */ options, verifyAfterGetFn, done) {
 
-        // Allow for optional redirectPath:
-        if (arguments.length === 5) {
-            verifyAfterGetFn = done;
-            done = redirectPath;
-            redirectPath = path;
+        // Allow for optional redirectPath and/or options:
+        var args = [].slice.call(arguments);
+        if (args.length === 5) {
+            verifyAfterGetFn = redirectPath;
+            done = options;
+            redirectPath = null;
+            options = null;
+        } else if (args.length === 6) {
+            if (typeof args[3] === 'string') {
+                // We have optional redirectPath but not options:
+                done = verifyAfterGetFn;
+                verifyAfterGetFn = options;
+                options = null;
+            } else {
+                // We have options but not redirectPath:
+                done = verifyAfterGetFn;
+                verifyAfterGetFn = options;
+                options = redirectPath;
+                redirectPath = null;
+            }
         }
+
+        redirectPath = redirectPath || path;
+        options = options || {};
 
         request(app)
             .post(path)

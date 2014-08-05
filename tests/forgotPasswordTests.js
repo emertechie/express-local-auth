@@ -65,7 +65,7 @@ describe('Forgot Password', function() {
         it('requires valid email', function(done) {
             var postData = { email: '' };
 
-            utils.verifyPostRedirectGet(app, '/forgotpassword', postData, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/forgotpassword', postData, function verifyAfterGet() {
                 assert.deepEqual(forgotPasswordValidationErrors, [{
                     email: {
                         param: 'email',
@@ -73,7 +73,7 @@ describe('Forgot Password', function() {
                         value: ''
                     }
                 }]);
-            });
+            }, done);
         });
 
         it('sends forgot password email for existing account on entering matching email', function(done) {
@@ -255,10 +255,10 @@ describe('Forgot Password', function() {
 
                 var postData = { email: existingUserEmail };
 
-                utils.verifyPostRedirectGet(app, '/forgotpassword', postData, done, function verifyAfterGet() {
+                utils.verifyPostRedirectGet(app, '/forgotpassword', postData, function verifyAfterGet() {
                     var expectedMsg = 'Please verify your email address first by clicking on the link in the registration email';
                     assert.deepEqual(forgotPasswordErrors, [ expectedMsg ]);
-                });
+                }, done);
             });
         });
 
@@ -452,7 +452,7 @@ describe('Forgot Password', function() {
             var postData = { token: '', email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=';
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet() {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     token: {
                         param: 'token',
@@ -460,14 +460,14 @@ describe('Forgot Password', function() {
                         value: ''
                     }
                 }]);
-            });
+            }, done);
         });
 
         it('ensures email is required', function(done) {
             var postData = { email: '', token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet() {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     email: {
                         param: 'email',
@@ -475,14 +475,14 @@ describe('Forgot Password', function() {
                         value: ''
                     }
                 }]);
-            });
+            }, done);
         });
 
         it('ensures password is required', function(done) {
             var postData = { password: '', confirmPassword: 'foo', token: passwordResetToken, email: existingUserEmail };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     password: {
                         param: 'password',
@@ -493,14 +493,14 @@ describe('Forgot Password', function() {
 
                 // Ensure token is preserved during redirect:
                 assert.equal(res.text, 'Dummy reset password page with token ' + passwordResetToken)
-            });
+            }, done);
         });
 
         it('ensures confirm password is required', function(done) {
             var postData = { password: 'foo', confirmPassword: '', token: passwordResetToken, email: existingUserEmail };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     confirmPassword: {
                         param: 'confirmPassword',
@@ -511,14 +511,14 @@ describe('Forgot Password', function() {
 
                 // Ensure token is preserved during redirect:
                 assert.equal(res.text, 'Dummy reset password page with token ' + passwordResetToken)
-            });
+            }, done);
         });
 
         it('ensures password matches confirm password', function(done) {
             var postData = { password: 'foo', confirmPassword: 'not-foo', token: passwordResetToken, email: existingUserEmail };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordValidationErrors, [{
                     confirmPassword: {
                         param: 'confirmPassword',
@@ -529,16 +529,16 @@ describe('Forgot Password', function() {
 
                 // Ensure token is preserved during redirect:
                 assert.equal(res.text, 'Dummy reset password page with token ' + passwordResetToken)
-            });
+            }, done);
         });
 
         it('ensures unknown password request tokens are ignored', function(done) {
             var postData = { token: 'unknown-token', email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=unknown-token';
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
-            });
+            }, done);
         });
 
         it('ensures that expired tokens are ignored', function(done) {
@@ -549,18 +549,18 @@ describe('Forgot Password', function() {
             var postData = { token: passwordResetToken, email: existingUserEmail, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
-            });
+            }, done);
         });
 
         it('ensures unknown password request emails are ignored', function(done) {
             var postData = { email: 'unknown-email@example.com', token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=unknown-email@example.com&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet(res) {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet(res) {
                 assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
-            });
+            }, done);
         });
 
         it('ensures password reset tokens for unknown users are ignored', function(done) {
@@ -571,9 +571,9 @@ describe('Forgot Password', function() {
             var postData = { email: existingUserEmail, token: passwordResetToken, password: 'foo', confirmPassword: 'foo' };
             var expectedRedirectPath = '/resetpassword?email=' + existingUserEmail + '&token=' + passwordResetToken;
 
-            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, done, function verifyAfterGet() {
+            utils.verifyPostRedirectGet(app, '/resetpassword', postData, expectedRedirectPath, function verifyAfterGet() {
                 assert.deepEqual(resetPasswordErrors, [ 'Unknown or expired token' ]);
-            });
+            }, done);
         });
 
         it('allows password to be reset', function(done) {

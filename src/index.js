@@ -40,7 +40,6 @@ module.exports = function(router, sharedServices, options) {
 
     options = _.defaults(options || {}, {
         loginPath: '/login',
-        loginView: 'login',
         useSession: true,
         normalizeCase: true,
         failedLoginsBeforeLockout: 10,

@@ -257,7 +257,6 @@ module.exports = function(sharedServices, options) {
         };
 
         // Aliases
-        handlers.logInView = handlers.loginView;
         handlers.logIn = handlers.login;
         handlers.logOut = handlers.logout;
 

@@ -7,14 +7,16 @@ Express middleware that provides secure username/email and password authenticati
 
 # Install
 
-`npm install express-local-auth`
+```
+npm install express-local-auth
+```
 
-# Features Overview
+# Overview
 
 * Uses a secure, [slow](http://codahale.com/how-to-safely-store-a-password/) hashing algoritm - [bcrypt](https://github.com/ncb000gt/node.bcrypt.js)
 * Locks out accounts after number of invalid login attempts
 * Supports email verification via a callback
-* Can ensure that password reset only allowed after email verified
+* Password reset only allowed after email verified
 * Password reset tokens have an expiry
 * Only stores a hashed version of password reset tokens (so if someone can read your DB through SQL injection for instance, they can't reset passwords using unhashed tokens)
 * Recognises if someone attempts to reset a password for an unknown account and can email the account holder
@@ -29,6 +31,8 @@ Features are implemented in a modular fashion and provided as simple route handl
 Uses the excellent [Passport](passportjs.org) library under the hood.
 
 # Quick Example Usage
+
+For full configuration sample, see [here](samples/server-side-views/index.js)
 
 ``` js
 
@@ -112,7 +116,7 @@ The `services` object passed into middleware factory should have the following p
 * `emailService` - An object implementing the [Email Service](#email-service) API
 * `userStore` - An object implementing the [User Store](#user-store) API
 * `passwordResetTokenStore` - An object implementing the [Token Store](#token-store) API
-* `verifyEmailTokenStore` - An object implementing the [Token Store](#token-store) API. Only required if the `verifyEmail` flag set to true in the `options`. This object can be the same instance as that passed to `passwordResetTokenStore` if you really want, but recommend having separate stores.
+* `verifyEmailTokenStore` - An object implementing the [Token Store](#token-store) API. Only required if the `verifyEmail` flag set to true in the `options`. **Note**: don't use the same instance as `passwordResetTokenStore` - use separate stores for each.
 * `logger` - An object with a standard logger interface. For instance you can assign a [Winston](https://github.com/flatiron/winston) logger instance.
 * `userIdGetter` - Optional function that takes a user object and returns the ID for that user. The system assumes that the [User Store](#user-store) service will set an `id` property when adding a user, so this function returns `user.id` by default.
 
@@ -134,7 +138,7 @@ var options = _.defaults(options || {}, {
 Details:
 * `loginPath` - The path where the login route is hosted. Needed for redirecting back to login page when unauthenticated for instance. Defaults to `'/login'`
 * `useSessions` - Whether to use sessions or not. If sessions are used (the default), it's expected that you have configured your app to use `express-session` etc. See samples for example usage. Also, errors are handled differently based on this setting. See [Error Handling](#error-handling) section.
-* `normalizeCase` - Whether to lowercase the user's email address when registering or when using it verify credentials.
+* `normalizeCase` - Whether to lowercase the user's email address when registering or when using it to verify credentials.
 * `failedLoginsBeforeLockout` - Self-explanatory I hope. A successful login will always reset a user's failed login count
 * `accountLockedMs` - How long to lock the account out for, in milliseconds, after `failedLoginsBeforeLockout` unsuccessful attempts
 * `tokenExpirationMins` - How long a password reset token is valid for. Note: A verify email token never expires
@@ -144,6 +148,8 @@ Details:
 
 **NOTE**: The examples below assume you are using sessions. If not,
 see the [Error Handling](#error-handling) section below for how to handle errors correctly.
+
+Details of individual routes below. Also, take a look at the working [sample](samples/server-side-views/index.js) provided.
 
 ## Login
 
@@ -155,7 +161,7 @@ see the [Error Handling](#error-handling) section below for how to handle errors
 
 ### Render login view
 
-Implement this as normal to render a login view with `email` and `password` input fields.
+Implement this as normal to render a login view with `email` and `password` input fields that get posted to the next route.
 
 ```js
 app.get('/login', function(req, res) {
@@ -178,8 +184,8 @@ app.post('/login', localAuth.login(), function(req, res) {
 Call `localAuth.logout()` middleware to log the user out before your own final middleware handler.
 
 ```js
-app.post('/login', localAuth.login(), function(req, res) {
-  res.redirect('/login');
+app.get('/logout', localAuth.logout(), function(req, res) {
+    res.redirect('/login');
 });
 ```
 
@@ -194,15 +200,15 @@ app.post('/login', localAuth.login(), function(req, res) {
 
 ### Render registration view
 
-Implement this as normal to render a registration view with `username` (optional), `email` and `password` fields:
+Implement this as normal to render a registration view with `username` (optional), `email` and `password` fields that get posted to the next route.
+
+If username not provided, it will default to `email`.
 
 ```js
 app.get('/register', function(req, res) {
     res.render('register');
 });
 ```
-
-If username not provided, it defaults to `email`.
 
 ### Perform user registration
 
@@ -248,7 +254,7 @@ app.post('/unregister', localAuth.unregister(), function(req, res) {
 
 ### Render change password view
 
-Implement this as normal to render a view which posts `oldPassword`, `newPassword` and `confirmNewPassword` to the next route handler:
+Implement this as normal to render a view which posts `oldPassword`, `newPassword` and `confirmNewPassword` to the next route.
 
 ```js
 app.get('/changepassword', function(req, res) {
@@ -278,7 +284,7 @@ app.post('/changepassword', localAuth.changePassword(), function(req, res) {
 
 ### Render forgot password view
 
-Implement this as normal to render a view with an `email` input field that gets POST-ed to /forgotpassword:
+Implement this as normal to render a view with an `email` input field that gets posted to the next route.
 
 ```js
 app.get('/forgotpassword', function(req, res) {
@@ -297,10 +303,10 @@ app.post('/forgotpassword', localAuth.forgotPassword(), function(req, res) {
 ```
 
 If a user is found with the posted email, the [Email Service](#email-service)
-should send an email to the user with a link back to the next GET /resetpassword route.
+is used to send an email to the user with a link to the next /resetpassword route.
 
 If no user found, the [Email Service](#email-service) can choose to notify the email address owner anyway
-to make them aware of possible hack attempt.
+to make them aware of a possible hack attempt.
 
 ### Render reset password callback view
 
@@ -340,7 +346,7 @@ This library is built to support session and session-less operation (see [option
 How errors are handled is different depending on which mode you choose as detailed below.
 
 ### Using Sessions
-If an error occurs during a route (validation or otherwise) you are redirected via a GET back to the original path and the error will be added to the session flash (via [connect-flash](https://github.com/jaredhanson/connect-flash)).
+If an error occurs during a route you are redirected via a GET back to the original path and the error will be added to the session flash (via [connect-flash](https://github.com/jaredhanson/connect-flash)).
 
 For example, if you do a POST to `/login` and an error occurs, you'll be redirected via a GET to `/login` and the flash will be populated as follows:
 * `req.flash('errors')` - will be an array of strings detailing any non-validation related errors.
@@ -370,7 +376,7 @@ app.use(function(req, res, next) {
 
 
 ### Not Using Sessions
-If an error occurs during a route (validation or otherwise) the following happens:
+If an error occurs during a route the following happens:
 * `res.status(statusCode)` is called with an appropriate, non-200 status code
 * `res.locals.errors` will be populated with any non-validation error strings. Same format as `req.flash('errors')` above.
 * `res.locals.validationErrors` will be populated with any validation error object. Same format as `req.flash('validationErrors')` above.

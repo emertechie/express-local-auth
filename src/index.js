@@ -40,7 +40,7 @@ module.exports = function(router, sharedServices, options) {
 
     options = _.defaults(options || {}, {
         loginPath: '/login',
-        useSession: true,
+        useSessions: true,
         normalizeCase: true,
         failedLoginsBeforeLockout: 10,
         accountLockedMs: 20 * minuteInMs,
@@ -82,7 +82,7 @@ module.exports = function(router, sharedServices, options) {
 function configureRouter(router, options) {
     router.use(passport.initialize());
 
-    if (options.useSession) {
+    if (options.useSessions) {
         router.use(passport.session());
     }
 

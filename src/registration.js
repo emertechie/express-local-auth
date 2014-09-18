@@ -11,7 +11,7 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         register: function (routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSession);
+            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
 
             return function registerHandler(req, res, next) {
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();

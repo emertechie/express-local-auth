@@ -8,7 +8,7 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         changePassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSession);
+            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
 
             return function changePasswordHandler(req, res, next) {
 

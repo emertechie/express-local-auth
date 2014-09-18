@@ -12,7 +12,7 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         forgotPassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSession);
+            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
 
             return function forgotPasswordHandler(req, res, next) {
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
@@ -128,7 +128,7 @@ module.exports = function(sharedServices, authService, options) {
             };
         },
         resetPassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSession);
+            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
 
             return function changePasswordHandler(req, res, next) {
 

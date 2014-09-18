@@ -1,8 +1,8 @@
 module.exports = {
-    getErrorRedirectOption: function(routeOptions, useSession) {
+    getErrorRedirectOption: function(routeOptions, useSessions) {
         return routeOptions.errorRedirect === false
             ? false
-            : routeOptions.errorRedirect || useSession;
+            : routeOptions.errorRedirect || useSessions;
     },
     handleValidationErrors: function(validationRedirect, redirectQueryParams) {
         return function(req, res, next) {

@@ -208,7 +208,7 @@ module.exports = function(sharedServices, options) {
                 }
             },
             login: function (routeOptions) {
-                var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSession);
+                var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
 
                 return function loginHandler(req, res, next) {
                     req.checkBody('email', 'Valid email address required').notEmpty().isEmail();

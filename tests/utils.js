@@ -14,7 +14,7 @@ var express = require('express'),
 module.exports = {
     configureExpress: function(options) {
         options = options || {
-            useSession: true
+            useSessions: true
         };
 
         var app = express();
@@ -23,7 +23,7 @@ module.exports = {
         app.set('view engine', 'jade');
         app.use(bodyParser.json());
 
-        if (options.useSession) {
+        if (options.useSessions) {
             app.use(cookieParser());
             // Note: In a real app running with HTTPS, you should use following to limit cookie access:
             // session({..., cookie: { httpOnly: true, secure: true } })

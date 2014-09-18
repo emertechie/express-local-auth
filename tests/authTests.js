@@ -32,7 +32,7 @@ describe('Forms-based Username and Password auth', function() {
 
         configureExpress = function(options) {
             options = options || {
-                useSession: true
+                useSessions: true
             };
 
             var app = express();
@@ -41,7 +41,7 @@ describe('Forms-based Username and Password auth', function() {
             app.set('view engine', 'jade');
             app.use(bodyParser.json());
 
-            if (options.useSession) {
+            if (options.useSessions) {
                 app.use(cookieParser());
                 // Note: In a real app running with HTTPS, you should use following to limit cookie access:
                 // session({..., cookie: { httpOnly: true, secure: true } })
@@ -78,7 +78,7 @@ describe('Forms-based Username and Password auth', function() {
 
         configureApp = function(options) {
             options = options || {};
-            var useSession = (options.auth && 'useSession' in options.auth) ? options.auth.useSession : true;
+            var useSessions = (options.auth && 'useSessions' in options.auth) ? options.auth.useSessions : true;
             app = configureExpress();
             configureLocalAuth(app, options);
             configureStandardRoutes(app);
@@ -172,7 +172,7 @@ describe('Forms-based Username and Password auth', function() {
             beforeEach(function(done) {
                 app = configureExpress();
                 configureLocalAuth(app, {
-                    useSession: false
+                    useSessions: false
                 });
 
                 app.post('/login', localAuth.login(), function(req, res) {
@@ -540,7 +540,7 @@ describe('Forms-based Username and Password auth', function() {
             beforeEach(function(done) {
                 app = configureExpress();
                 configureLocalAuth(app, {
-                    useSession: false
+                    useSessions: false
                 });
 
                 app.post('/login', localAuth.login(), function(req, res) {

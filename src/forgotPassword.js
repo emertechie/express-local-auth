@@ -60,7 +60,7 @@ module.exports = function(sharedServices, authService, options) {
                             function(callback) {
                                 passwordResetTokenStore.add(tokenObj, callback);
                             },
-                            function(addedToken, callback) {
+                            function(callback) {
                                 logger.info('Sending forgot password email for user "%s"', email);
 
                                 var verifyQueryString = '?email=' + email + '&token=' + unhashedToken;

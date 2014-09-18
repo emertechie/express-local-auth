@@ -9,7 +9,7 @@ FakeTokenStore.prototype.add = function(tokenDetails, callback) {
     var cloned = clone(tokenDetails);
     cloned.tokenId = 'Token#' + (++this.lastId);
     this.tokens.push(cloned);
-    callback(null, cloned);
+    callback(null);
 };
 
 FakeTokenStore.prototype.removeAllByEmail = function(email, callback) {

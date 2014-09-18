@@ -54,7 +54,7 @@ app.use(function(req, res, next) {
 // ------------------------------------------------------------
 
 app.get('/login', function(req, res) {
-    res.render('login', { testFoo: 'blah' });
+    res.render('login');
 });
 app.post('/login', localAuth.login(), function(req, res) {
     res.redirect('/home');

@@ -62,7 +62,7 @@ module.exports = function(sharedServices, authService, options) {
                                     return next(err);
                                 }
 
-                                emailService.sendPasswordChangedEmail(authenticatedUser, function(err) {
+                                emailService.sendPasswordSuccessfullyChangedEmail(authenticatedUser, function(err) {
                                     if (err) {
                                         logger.error('Could not send password changed email for user "%s"', email, err);
                                     }

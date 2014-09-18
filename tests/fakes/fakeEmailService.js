@@ -11,7 +11,7 @@ module.exports = {
     sendPasswordSuccessfullyResetEmail: function(user, cb) {
         cb(null);
     },
-    sendPasswordChangedEmail: function(user, cb) {
+    sendPasswordSuccessfullyChangedEmail: function(user, cb) {
         cb(null);
     }
 };

@@ -19,7 +19,7 @@ module.exports = {
         console.log('Pretending to send password reset email to ' + user.email);
         cb(null);
     },
-    sendPasswordChangedEmail: function(user, cb) {
+    sendPasswordSuccessfullyChangedEmail: function(user, cb) {
         console.log('Pretending to send password changed email to ' + user.email);
         cb(null);
     }

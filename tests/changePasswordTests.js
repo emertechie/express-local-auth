@@ -158,14 +158,14 @@ describe('Changing Password', function() {
     it('emails user when password changed', function(done) {
         var postData = { oldPassword: existingUserPassword, newPassword: 'new-pass', confirmNewPassword: 'new-pass' };
 
-        fakeEmailService.sendPasswordChangedEmail = sinon.stub().yields(null);
+        fakeEmailService.sendPasswordSuccessfullyChangedEmail = sinon.stub().yields(null);
 
         request(app)
             .post('/changepassword')
             .send(postData)
             .expect(200)
             .expect(function() {
-                assert.isTrue(fakeEmailService.sendPasswordChangedEmail.calledWith(
+                assert.isTrue(fakeEmailService.sendPasswordSuccessfullyChangedEmail.calledWith(
                     sinon.match.has('email', existingUserEmail)
                 ), 'User is emailed password changed confirmation');
             })

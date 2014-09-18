@@ -8,7 +8,7 @@ module.exports = {
     sendForgotPasswordNotificationForUnregisteredEmail: function(email, cb) {
         cb(null);
     },
-    sendPasswordResetEmail: function(user, cb) {
+    sendPasswordSuccessfullyResetEmail: function(user, cb) {
         cb(null);
     },
     sendPasswordChangedEmail: function(user, cb) {

@@ -623,14 +623,14 @@ describe('Forgot Password', function() {
 
         it('emails user confirmation of change after password reset', function(done) {
 
-            fakeEmailService.sendPasswordResetEmail = sinon.stub().yields(null);
+            fakeEmailService.sendPasswordSuccessfullyResetEmail = sinon.stub().yields(null);
 
             resetPassword(existingUserEmail, passwordResetToken, 'new-password', function(err) {
                 if (err) {
                     return done(err);
                 }
 
-                assert.isTrue(fakeEmailService.sendPasswordResetEmail.calledWith(
+                assert.isTrue(fakeEmailService.sendPasswordSuccessfullyResetEmail.calledWith(
                     sinon.match.has('email', existingUserEmail)
                 ), 'User is emailed password reset confirmation');
 

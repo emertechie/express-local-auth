@@ -15,7 +15,7 @@ module.exports = {
         console.log('Pretending to send notification of password reset for unknown email ' + email);
         cb(null);
     },
-    sendPasswordResetEmail: function(user, cb) {
+    sendPasswordSuccessfullyResetEmail: function(user, cb) {
         console.log('Pretending to send password reset email to ' + user.email);
         cb(null);
     },

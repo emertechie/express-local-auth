@@ -194,7 +194,7 @@ module.exports = function(sharedServices, authService, options) {
                                         return next(err);
                                     }
 
-                                    emailService.sendPasswordResetEmail(user, function(err) {
+                                    emailService.sendPasswordSuccessfullyResetEmail(user, function(err) {
                                         if (err) {
                                             logger.error('Could not send password reset email for user "%s"', email, err);
                                         }

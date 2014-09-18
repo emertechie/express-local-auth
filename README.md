@@ -91,6 +91,55 @@ app.post('/changepassword', localAuth.changePassword(), function(req, res) {
 // More route handlers available! See below
 
 ```
+
+# Configuration
+
+The object returned by `require('express-local-auth')` is a factory function expecting the following parameters:
+
+``` js
+var localAuth = localAuthFactory(expressApp, services, options);
+```
+* `expressApp` - a standard express app object, configured for sessions etc as appropriate. See [examples](#TODO) for more details.
+* `services` - Services configuration object. See [below](#services).
+* `options` - Options object. See [below](#options).
+
+## Services
+
+This middleware depends on some simple abstractions over external services. You are free to provide whatever implementations you like.
+
+The `services` object passed into middleware factory should have the following properties:
+
+* `emailService` - An object implementing the [Email Service](#email-service) API
+* `userStore` - An object implementing the [User Store](#user-store) API
+* `passwordResetTokenStore` - An object implementing the [Token Store](#token-store) API
+* `verifyEmailTokenStore` - An object implementing the [Token Store](#token-store) API. Only required if the `verifyEmail` flag set to true in the `options`. This object can be the same instance as that passed to `passwordResetTokenStore` if you really want, but recommend having separate stores.
+* `logger` - An object with a standard logger interface. For instance you can assign a [Winston](https://github.com/flatiron/winston) logger instance.
+* `userIdGetter` - Optional function that takes a user object and returns the ID for that user. The system assumes that the [User Store](#user-store) service will set an `id` property when adding a user, so this function returns `user.id` by default.
+
+## Options
+
+```js
+// The default options:
+var options = _.defaults(options || {}, {
+  loginPath: '/login',
+  useSessions: true,
+  normalizeCase: true,
+  failedLoginsBeforeLockout: 10,
+  accountLockedMs: 20 * minuteInMs,
+  tokenExpirationMins: 60,
+  verifyEmail: false
+});
+```
+
+Details:
+* `loginPath` - The path where the login route is hosted. Needed for redirecting back to login page when unauthenticated for instance. Defaults to `'/login'`
+* `useSessions` - Whether to use sessions or not. If sessions are used (the default), it's expected that you have configured your app to use `express-session` etc. See samples for example usage. Also, errors are handled differently based on this setting. See [Error Handling](#error-handling) section.
+* `normalizeCase` - Whether to lowercase the user's email address when registering or when using it verify credentials.
+* `failedLoginsBeforeLockout` - Self-explanatory I hope. A successful login will always reset a user's failed login count
+* `accountLockedMs` - How long to lock the account out for, in milliseconds, after `failedLoginsBeforeLockout` unsuccessful attempts
+* `tokenExpirationMins` - How long a password reset token is valid for. Note: A verify email token never expires
+* `verifyEmail` - Whether to expect users to verify their email addresses. If this is true, an `emailVerified` property will be added to user object which will only be set to true if user hits the verify email callback with correct token. Also, if this is true then user must verify email address before a password reset is allowed.
+
 # Routes
 
 **NOTE**: The examples below assume you are using sessions. If not,
@@ -285,54 +334,6 @@ app.post('/resetpassword', localAuth.resetPassword(), function(req, res) {
 });
 ```
 
-# Configuration
-
-The object returned by `require('express-local-auth')` is a factory function expecting the following parameters:
-
-``` js
-var localAuth = localAuthFactory(expressApp, services, options);
-```
-* `expressApp` - a standard express app object, configured for sessions etc as appropriate. See [examples](#TODO) for more details.
-* `services` - Services configuration object. See [below](#services).
-* `options` - Options object. See [below](#options).
-
-## Services
-
-This middleware depends on some simple abstractions over external services. You are free to provide whatever implementations you like.
-
-The `services` object passed into middleware factory should have the following properties:
-
-* `emailService` - An object implementing the [Email Service](#email-service) API
-* `userStore` - An object implementing the [User Store](#user-store) API
-* `passwordResetTokenStore` - An object implementing the [Token Store](#token-store) API
-* `verifyEmailTokenStore` - An object implementing the [Token Store](#token-store) API. Only required if the `verifyEmail` flag set to true in the `options`. This object can be the same instance as that passed to `passwordResetTokenStore` if you really want, but recommend having separate stores.
-* `logger` - An object with a standard logger interface. For instance you can assign a [Winston](https://github.com/flatiron/winston) logger instance.
-* `userIdGetter` - Optional function that takes a user object and returns the ID for that user. The system assumes that the [User Store](#user-store) service will set an `id` property when adding a user, so this function returns `user.id` by default.
-
-## Options
-
-```js
-// The default options:
-var options = _.defaults(options || {}, {
-  loginPath: '/login',
-  useSessions: true,
-  normalizeCase: true,
-  failedLoginsBeforeLockout: 10,
-  accountLockedMs: 20 * minuteInMs,
-  tokenExpirationMins: 60,
-  verifyEmail: false
-});
-```
-
-Details:
-* `loginPath` - The path where the login route is hosted. Needed for redirecting back to login page when unauthenticated for instance. Defaults to `'/login'`
-* `useSessions` - Whether to use sessions or not. If sessions are used (the default), it's expected that you have configured your app to use `express-session` etc. See samples for example usage. Also, errors are handled differently based on this setting. See [Error Handling](#error-handling) section.
-* `normalizeCase` - Whether to lowercase the user's email address when registering or when using it verify credentials.
-* `failedLoginsBeforeLockout` - Self-explanatory I hope. A successful login will always reset a user's failed login count
-* `accountLockedMs` - How long to lock the account out for, in milliseconds, after `failedLoginsBeforeLockout` unsuccessful attempts
-* `tokenExpirationMins` - How long a password reset token is valid for. Note: A verify email token never expires
-* `verifyEmail` - Whether to expect users to verify their email addresses. If this is true, an `emailVerified` property will be added to user object which will only be set to true if user hits the verify email callback with correct token. Also, if this is true then user must verify email address before a password reset is allowed.
-
 # Error Handling
 
 This library is built to support session and session-less operation (see [options](#options.useSessions)).
@@ -422,12 +423,12 @@ See the [fake email service](samples/fakes/emailService.js) in the samples folde
 The expected API for this service is:
 
 #### sendRegistrationEmail(user, verifyQueryString, callback)
-* `user` - user object. See below for more details
+* `user` - [user object](#user-object)
 * `verifyQueryString` - the query string part of the URL (including leading '?' character) that user visits to verify email. For instance, if you host the callback route at `http://example.com/verifyemail`, then the link included in email should be `"http://example.com/verifyemail" + verifyQueryString`. This will be null if the `verifyEmail` [option](#options) is false.
 * `callback(err)` - standard node callback when operation complete
 
 #### sendForgotPasswordEmail(user, verifyQueryString, callback)
-* `user` - user object. See below for more details
+* `user` - [user object](#user-object)
 * `verifyQueryString` - the query string part of the URL (including leading '?' character) that user visits to initiate password reset process. For instance, if you host the callback route at `http://example.com/resetpassword`, then the link included in email should be `"http://example.com/resetpassword" + verifyQueryString`
 * `callback(err)` - standard node callback when operation complete
 
@@ -438,13 +439,13 @@ The expected API for this service is:
 Called if a user attempts to reset a password for an unknown email address. You are free to leave the implementation empty (well, invoke the `callback` at least) or you can send a nice email to that address saying someone tried to reset your password.
 
 #### sendPasswordSuccessfullyResetEmail(user, callback)
-* `user` - user object. See below for more details
+* `user` - [user object](#user-object)
 * `callback(err)` - standard node callback when operation complete
 
 Invoked after user has followed the password reset process. Email user and let them know they can now log in with new password.
 
 #### sendPasswordSuccessfullyChangedEmail(user, callback)
-* `user` - user object. See below for more details
+* `user` - [user object](#user-object)
 * `callback(err)` - standard node callback when operation complete
 
 Invoked after password changed via normal change password process. Email them a confirmation email.
@@ -456,7 +457,7 @@ See the [fake User Store](tests/fakes/userStore) used in tests to get a quick id
 The expected API for this service is:
 
 #### add(userDetails, callback)
-* `user` - user object. See below for more details
+* `userDetails` - A user object containing `username`, `email` and `hashedPassword`
 * `callback(err, userAlreadyExists, user)` - The `userAlreadyExists` param should be set to `true` if this is a duplicate registration, false otherwise. The `user` param should be an object containing the same `userDetails` passed in **plus** an ID property. By default it's assumed the ID property is called `id`. If it's something else, provide a custom [services.userIdGetter](#services) function.
 
 #### get(userId, callback)
@@ -475,7 +476,25 @@ The expected API for this service is:
 * `email` - The email to lookup
 * `callback(err, user)` - The `user` param should be the user object if found, falsy otherwise. Note: don't set the `err` parameter just because user isn't found - they are two separate concerns.
 
+## Token Store
+
+The same Token Store service API is used for email verification tokens as well as password reset tokens.
+
+See the [fake Token Store](tests/fakes/tokenStore) used in tests to get a quick idea of how to implement.
+
+The expected API for this service is:
+
+#### add(tokenDetails, callback)
+* `tokenDetails` - object containing `email`, `userId` properties and for password reset tokens an `expiry` also.
+* `callback(err)` - standard node callback when operation complete
+
+### removeAllByEmail(email, callback)
+* `email` - email address to remove tokens for
+* `callback(err)` - standard node callback when operation complete
+
+### findByEmail(email, callback)
+* `email` - email address to find tokens for
+* `callback(err)` - standard node callback when operation complete
+
 # User object
 Any `user` object mentioned in APIs will have `email` and `username` properties along with other properties that the `UserStore` might add such as an `id`.
-
-The `username` will default to email address if only `email` provided.

@@ -12,7 +12,6 @@ Express middleware that provides secure username/email and password authenticati
 # Features Overview
 
 * Uses a secure, [slow](http://codahale.com/how-to-safely-store-a-password/) hashing algoritm - [bcrypt](https://github.com/ncb000gt/node.bcrypt.js)
-* Supports session-based and session-less authentication models
 * Locks out accounts after number of invalid login attempts
 * Supports email verification via a callback
 * Can ensure that password reset only allowed after email verified
@@ -22,6 +21,7 @@ Express middleware that provides secure username/email and password authenticati
 * Requires original password before allowing a password change
 * Not tied to any database or email provider - you implement simple service abstractions
 * Logs extensively so if something fishy is going on, you have all the info you need
+* Supports session-based and session-less operation
 * Extensive unit-tests included
 
 Features are implemented in a modular fashion and provided as simple route handlers for you to wire up as you see fit.
@@ -93,38 +93,20 @@ app.post('/changepassword', localAuth.changePassword(), function(req, res) {
 ```
 # Routes
 
-## First, a word about sessions
-
-This library is built to support session and session-less auth (see [options](#options)). How errors are handled is different depending on which you choose as detailed below.
-
-### Session based
-If an error occurs during a route (validation or otherwise) you are redirected via a GET back to the original path and the error will be added to the session flash (via [connect-flash](https://github.com/jaredhanson/connect-flash)).
-
-For example, if you do a POST to `/login` and an error occurs, you'll be redirected via a GET to `/login` and the flash will be populated as follows:
-* `req.flash('errors')` - will be an array of strings detailing any non-validation related errors.
-* `req.flash('validationErrors')` - will be an array of validation error objects as returned by the `req.validationErrors()` function of the [express-validator](https://github.com/ctavan/express-validator) library
-
-### Session-less
-If an error occurs during a route (validation or otherwise) the following happens:
-* `res.status(statusCode)` is called with an appropriate, non-200 status code
-* `res.locals.errors` will be populated with any non-validation error strings. Same format as `req.flash('errors')` above.
-* `res.locals.validationErrors` will be populated with any validation error object. Same format as `req.flash('validationErrors')` above.
-* `next()` will be called to invoke the next middleware handler.
-
-So if not using sessions, use a middleware handler at the end of the chain that checks for non-200 status code and examines `res.locals.errors/validationErrors` in those cases.
-
-Hope to get a sample together soon showing that usage.
+**NOTE**: The examples below assume you are using sessions. If not,
+see the [Error Handling](#error-handling) section below for how to handle errors correctly.
 
 ## Login
 
-|# | Method | Suggested Path | Provided Middleware      |
-|--|--------|----------------|--------------------------|
-|1 | GET    | /login         |                          |
-|2 | POST   | /login         | localAuth.login(options) |
+|Operation              | Method | Suggested Path | Provided Middleware      |
+|-----------------------|--------|----------------|--------------------------|
+|Render login view      | GET    | /login         |                          |
+|Perform login          | POST   | /login         | localAuth.login() |
+|Perform logout         | POST   | /logout        | localAuth.logout()        |
 
-### #1 - Render login view
+### Render login view
 
-Implement this as normal to render a login view. For example:
+Implement this as normal to render a login view with `email` and `password` input fields.
 
 ```js
 app.get('/login', function(req, res) {
@@ -132,14 +114,174 @@ app.get('/login', function(req, res) {
 });
 ```
 
+### Perform login
 
-### #2 - Perform login
-
-Call `localAuth.login()` middleware to perform the login before your own final middleware handler. The final handler will
+Call `localAuth.login()` middleware to perform the login before your own final middleware handler.
 
 ```js
 app.post('/login', localAuth.login(), function(req, res) {
+  res.redirect('/home');
+});
+```
+
+### Perform logout
+
+Call `localAuth.logout()` middleware to log the user out before your own final middleware handler.
+
+```js
+app.post('/login', localAuth.login(), function(req, res) {
+  res.redirect('/login');
+});
+```
+
+## User Registration
+
+|Operation                   | Method | Suggested Path | Provided Middleware          |
+|----------------------------|--------|----------------|------------------------------|
+|Render registration view    | GET    | /register      |                              |
+|Perform user registration   | POST   | /register      | localAuth.register()  |
+|Verify email callback       | GET    | /verifyemail   | localAuth.verifyEmailView()  |
+|Delete user                 | POST   | /unregister    | localAuth.unregister()       |
+
+### Render registration view
+
+Implement this as normal to render a registration view with `username` (optional), `email` and `password` fields:
+
+```js
+app.get('/register', function(req, res) {
+    res.render('register');
+});
+```
+
+If username not provided, it defaults to `email`.
+
+### Perform user registration
+
+Call `localAuth.register()` middleware to register the user before your own final middleware handler.
+
+```js
+app.post('/register', localAuth.register(), function(req, res) {
+    req.flash('successMsgs', 'Registered successfully');
     res.redirect('/home');
+});
+```
+
+### Verify email callback
+
+The route that will be invoked when user clicks on link in the registration email.
+The provided handler will verify the supplied token and remove it from the [Token Store](#token-store) if successful.
+
+The route handler will not do a redirect on error, so you must check the `res.statusCode` value to see if an error occurred:
+
+```js
+app.get('/verifyemail', localAuth.verifyEmailView(), function(req, res) {
+    res.render('email_verification', { emailVerified: res.statusCode == 200 });
+});
+```
+
+### Delete user
+
+Call `localAuth.unregister()` middleware to delete the user before your own final middleware handler.
+
+```js
+app.post('/unregister', localAuth.unregister(), function(req, res) {
+    req.flash('successMsgs', 'Successfully deleted user');
+    res.redirect('/register');
+});
+```
+
+## Change Password
+
+|Operation                           | Method | Suggested Path  | Provided Middleware          |
+|------------------------------------|--------|-----------------|------------------------------|
+|Render change password view         | GET    | /changepassword |                              |
+|Change password                     | POST   | /changePassword | localAuth.changePassword()   |
+
+### Render change password view
+
+Implement this as normal to render a view which posts `oldPassword`, `newPassword` and `confirmNewPassword` to the next route handler:
+
+```js
+app.get('/changepassword', function(req, res) {
+    res.render('change_password');
+});
+```
+
+### Change password
+
+Call `localAuth.changePassword()` middleware to verify the old password and change user's password before invoking your own final middleware handler.
+
+```js
+app.post('/changepassword', localAuth.changePassword(), function(req, res) {
+    req.flash('successMsgs', 'Your password has been changed');
+    res.redirect('/home');
+});
+```
+
+## Password reset
+
+|Operation                           | Method | Suggested Path  | Provided Middleware          |
+|------------------------------------|--------|-----------------|------------------------------|
+|Render forgot password view         | GET    | /forgotpassword |                              |
+|Start password reset process        | POST   | /forgotpassword | localAuth.forgotPassword()   |
+|Render reset password callback view | GET    | /resetpassword  | localAuth.resetPasswordView()|
+|Perform password reset              | POST   | /resetpassword  | localAuth.resetPassword()    |
+
+### Render forgot password view
+
+Implement this as normal to render a view with an `email` input field that gets POST-ed to /forgotpassword:
+
+```js
+app.get('/forgotpassword', function(req, res) {
+    res.render('forgot_password');
+});
+```
+
+### Start password reset process
+
+Call `localAuth.forgotPassword()` middleware to start the password reset process:
+
+```js
+app.post('/forgotpassword', localAuth.forgotPassword(), function(req, res) {
+    res.render('password_reset_requested', { email: res.locals.email });
+});
+```
+
+If a user is found with the posted email, the [Email Service](#email-service)
+should send an email to the user with a link back to the next GET /resetpassword route.
+
+If no user found, the [Email Service](#email-service) can choose to notify the email address owner anyway
+to make them aware of possible hack attempt.
+
+### Render reset password callback view
+
+The route that gets invoked when a user clicks on link in a password reset email.
+You should call the supplied `localAuth.resetPasswordView()` handler first to
+verify the supplied token exists and is still valid.
+
+After that, render a view which will POST `password` and `confirmPassword` fields
+and hidden `email` and `token` fields to the next /resetpassword route.
+
+```js
+app.get('/resetpassword', localAuth.resetPasswordView(), function(req, res) {
+    res.render('reset_password');
+});
+```
+
+### Perform password reset
+
+Call `localAuth.resetPassword()` middleware to reset the user's password before your own final middleware handler.
+
+The supplied handler will:
+- verify the password reset token exists and is still valid
+- update the user with new password
+- delete the token from the [Token Store](#token-store)
+- use the [Email Service](#email-service) to notify user that password was reset
+
+```js
+app.post('/resetpassword', localAuth.resetPassword(), function(req, res) {
+    req.flash('successMsgs', 'Your password has been reset');
+    res.redirect('/login');
 });
 ```
 
@@ -173,7 +315,7 @@ The `services` object passed into middleware factory should have the following p
 // The default options:
 var options = _.defaults(options || {}, {
   loginPath: '/login',
-  useSession: true,
+  useSessions: true,
   normalizeCase: true,
   failedLoginsBeforeLockout: 10,
   accountLockedMs: 20 * minuteInMs,
@@ -184,16 +326,92 @@ var options = _.defaults(options || {}, {
 
 Details:
 * `loginPath` - The path where the login route is hosted. Needed for redirecting back to login page when unauthenticated for instance. Defaults to `'/login'`
-* `useSessions` - Whether to use sessions or not. See [Session-less authentication](#session-less-authentication) section below for more details
+* `useSessions` - Whether to use sessions or not. If sessions are used (the default), it's expected that you have configured your app to use `express-session` etc. See samples for example usage. Also, errors are handled differently based on this setting. See [Error Handling](#error-handling) section.
 * `normalizeCase` - Whether to lowercase the user's email address when registering or when using it verify credentials.
 * `failedLoginsBeforeLockout` - Self-explanatory I hope. A successful login will always reset a user's failed login count
 * `accountLockedMs` - How long to lock the account out for, in milliseconds, after `failedLoginsBeforeLockout` unsuccessful attempts
 * `tokenExpirationMins` - How long a password reset token is valid for. Note: A verify email token never expires
 * `verifyEmail` - Whether to expect users to verify their email addresses. If this is true, an `emailVerified` property will be added to user object which will only be set to true if user hits the verify email callback with correct token. Also, if this is true then user must verify email address before a password reset is allowed.
 
-## Session-less authentication
+# Error Handling
 
-Todo
+This library is built to support session and session-less operation (see [options](#options.useSessions)).
+How errors are handled is different depending on which mode you choose as detailed below.
+
+### Using Sessions
+If an error occurs during a route (validation or otherwise) you are redirected via a GET back to the original path and the error will be added to the session flash (via [connect-flash](https://github.com/jaredhanson/connect-flash)).
+
+For example, if you do a POST to `/login` and an error occurs, you'll be redirected via a GET to `/login` and the flash will be populated as follows:
+* `req.flash('errors')` - will be an array of strings detailing any non-validation related errors.
+* `req.flash('validationErrors')` - will be an array of validation error objects as returned by the `req.validationErrors()` function of the [express-validator](https://github.com/ctavan/express-validator) library
+
+So when using sessions, unless otherwise noted, you don't need to do any explicit error handling in your own middleware handler after calling a `localAuth` handler as the `localAuth` handler will do a redirect on an error. E.g:
+
+```js
+app.post('/login', localAuth.login(), function(req, res) {
+
+  // No explicit error-handling needed here
+
+  res.redirect('/home');
+});
+```
+
+But you will need to check for errors in the session flash and make them available for display in views:
+```js
+app.use(function(req, res, next) {
+    // Transfer flash state, if present, to locals so views can access:
+    res.locals.errors = (res.locals.errors || []).concat(req.flash('errors'));
+    res.locals.validationErrors = (res.locals.validationErrors || []).concat(req.flash('validationErrors'));
+    res.locals.successMsgs = (res.locals.successMsgs || []).concat(req.flash('successMsgs'));
+    next();
+});
+```
+
+
+### Not Using Sessions
+If an error occurs during a route (validation or otherwise) the following happens:
+* `res.status(statusCode)` is called with an appropriate, non-200 status code
+* `res.locals.errors` will be populated with any non-validation error strings. Same format as `req.flash('errors')` above.
+* `res.locals.validationErrors` will be populated with any validation error object. Same format as `req.flash('validationErrors')` above.
+* `next()` will be called to invoke the next middleware handler.
+
+So to take the example above, you would need:
+
+```js
+app.post('/login', localAuth.login(), function(req, res) {
+
+  // Need to check res.locals.errors and res.locals.validationErrors here
+
+  res.redirect('/home');
+});
+```
+Hope to get a full sample together soon showing session-less usage. At the moment, it's theoretical :)
+
+### Per-route configuration
+
+Route handlers provided by this middleware will have an `options` object which has a `errorRedirect` property which you can set to `false` to force non-session based operation for that route. For example:
+
+```js
+app.post('/login', localAuth.login({ errorRedirect: false }), function(req, res) {
+
+  // Handle errors yourself here by checking  
+  // res.locals.errors and res.locals.validationErrors
+  // ...
+
+  res.redirect('/home');
+});
+```
+
+### Unexpected errors
+
+If a callback returns an error, this is immediately used to call `next(err)` so you will also need an overall error handler for your application as usual. For example:
+
+```js
+app.use(function(err, req, res, next) {
+    logger.error(err);
+    res.status(500).render('error');
+});
+```
 
 # Service APIs
 

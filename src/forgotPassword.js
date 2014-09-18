@@ -87,7 +87,7 @@ module.exports = function(sharedServices, authService, options) {
             };
         },
         resetPasswordView: function() {
-            return function changePasswordViewHandler(req, res, next) {
+            return function resetPasswordViewHandler(req, res, next) {
                 var hasTokenParam = 'token' in req.query;
                 var hasFlashErrors = (req.session && req.session.flash)
                     ? req.session.flash.validationErrors || req.session.flash.errors

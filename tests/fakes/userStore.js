@@ -29,11 +29,12 @@ FakeUserStore.prototype.update = function(user, callback) {
     });
 
     if (userIdx === -1) {
-        return callback(null, false);
+        return callback(null, null);
     }
 
-    this.users[userIdx] = clone(user);
-    return callback(null, true);
+    var updated = clone(user);
+    this.users[userIdx] = updated;
+    return callback(null, updated);
 };
 
 FakeUserStore.prototype.remove = function(userId, callback) {

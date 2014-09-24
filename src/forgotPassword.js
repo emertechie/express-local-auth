@@ -12,11 +12,14 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         forgotPassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
+            var errorCfg = utils.getErrorConfig(options, routeOptions);
 
             return function forgotPasswordHandler(req, res, next) {
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
-                if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
+                    return;
+                }
+                if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }
 
@@ -35,7 +38,7 @@ module.exports = function(sharedServices, authService, options) {
                     if (user) {
                         if (options.verifyEmail && !user.emailVerified) {
                             var errorMsg = 'Please verify your email address first by clicking on the link in the registration email';
-                            return utils.handleError(errorMsg, errorRedirect, 400)(req, res, next);
+                            return utils.handleError(errorMsg, errorCfg, 400)(req, res, next);
                         }
 
                         var unhashedToken = uuid.v4().replace(/-/g, '');
@@ -100,8 +103,8 @@ module.exports = function(sharedServices, authService, options) {
 
                 req.checkQuery('token', 'Password reset token required').notEmpty();
                 req.checkQuery('email', 'Email address required').notEmpty();
-                var errorRedirect = false;
-                if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                var errorCfg = utils.getErrorConfig(options, { errorRedirect: false });
+                if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }
 
@@ -128,7 +131,7 @@ module.exports = function(sharedServices, authService, options) {
             };
         },
         resetPassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
+            var errorCfg = utils.getErrorConfig(options, routeOptions);
 
             return function changePasswordHandler(req, res, next) {
 
@@ -139,13 +142,13 @@ module.exports = function(sharedServices, authService, options) {
 
                 var errorRedirectQueryParams = '?email=' + (req.body.email || '') + '&token=' + (req.body.token || '');
 
-                if (utils.handleValidationErrors(errorRedirect, errorRedirectQueryParams)(req, res, next)) {
+                if (utils.handleValidationErrors(errorCfg, errorRedirectQueryParams)(req, res, next)) {
                     return;
                 }
 
                 // Only check confirm password after we know others are ok to avoid returning a redundant error
                 req.checkBody('confirmPassword', 'Password and confirm password do not match').matches('password', req);
-                if (utils.handleValidationErrors(errorRedirect, errorRedirectQueryParams)(req, res, next)) {
+                if (utils.handleValidationErrors(errorCfg, errorRedirectQueryParams)(req, res, next)) {
                     return;
                 }
 
@@ -161,7 +164,7 @@ module.exports = function(sharedServices, authService, options) {
 
                     if (!isValid) {
                         logger.info('Invalid password reset token found for email "%s" in reset password handler', email);
-                        return utils.handleError('Unknown or expired token', errorRedirect, errorRedirectQueryParams, 400)(req, res, next);
+                        return utils.handleError('Unknown or expired token', errorCfg, errorRedirectQueryParams, 400)(req, res, next);
                     }
 
                     authService.hash(password, function(err, hashedPassword) {
@@ -177,7 +180,7 @@ module.exports = function(sharedServices, authService, options) {
                             }
                             if (!user) {
                                 logger.info('Unknown user "%s" in reset password handler', email);
-                                return utils.handleError('Unknown or expired token', errorRedirect, errorRedirectQueryParams, 400)(req, res, next);
+                                return utils.handleError('Unknown or expired token', errorCfg, errorRedirectQueryParams, 400)(req, res, next);
                             }
 
                             user.hashedPassword = hashedPassword;

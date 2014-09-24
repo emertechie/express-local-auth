@@ -46,8 +46,6 @@ app.use(express.static(__dirname + '/public'));
 // ...
 
 // 2. Configure express-local-auth
-
-// Define service dependencies. See below for details
 var services = {
     emailService: myEmailService,
     userStore: myUserStore,
@@ -55,13 +53,10 @@ var services = {
     verifyEmailTokenStore: myVerifyEmailTokenStore,
     logger: logger
 };
-
-// More options available. See below
 var options = {
   failedLoginsBeforeLockout: 5,
   verifyEmail: true
 };
-
 var localAuth = localAuthFactory(app, services, options);
 
 // 3. Define your app routes and use those provided by localAuth object where appropriate. See guide below
@@ -92,7 +87,7 @@ app.post('/changepassword', localAuth.changePassword(), function(req, res) {
     res.redirect('/home');
 });
 
-// More route handlers available! See below
+// ... more route handlers
 
 ```
 
@@ -127,6 +122,7 @@ The `services` object passed into middleware factory should have the following p
 var options = _.defaults(options || {}, {
   loginPath: '/login',
   useSessions: true,
+  autoSendErrors: false,
   normalizeCase: true,
   failedLoginsBeforeLockout: 10,
   accountLockedMs: 20 * minuteInMs,
@@ -135,14 +131,35 @@ var options = _.defaults(options || {}, {
 });
 ```
 
-Details:
 * `loginPath` - The path where the login route is hosted. Needed for redirecting back to login page when unauthenticated for instance. Defaults to `'/login'`
 * `useSessions` - Whether to use sessions or not. If sessions are used (the default), it's expected that you have configured your app to use `express-session` etc. See samples for example usage. Also, errors are handled differently based on this setting. See [Error Handling](#error-handling) section.
+* `autoSendErrors` - Only applies if not using sessions. If `true`, any provided middleware will automatically call `res.send(error)` on an error and end the request there - i.e. it will not call `next()` so any following middleware functions won't get invoked. If `false`, will set `res.locals['errors']` or `res.locals['validationErrors']` before calling `next()` to invoke any following middleware functions.
 * `normalizeCase` - Whether to lowercase the user's email address when registering or when using it to verify credentials.
 * `failedLoginsBeforeLockout` - Self-explanatory I hope. A successful login will always reset a user's failed login count
 * `accountLockedMs` - How long to lock the account out for, in milliseconds, after `failedLoginsBeforeLockout` unsuccessful attempts
 * `tokenExpirationMins` - How long a password reset token is valid for. Note: A verify email token never expires
 * `verifyEmail` - Whether to expect users to verify their email addresses. If this is true, an `emailVerified` property will be added to user object which will only be set to true if user hits the verify email callback with correct token. Also, if this is true then user must verify email address before a password reset is allowed.
+
+# Usage Modes
+
+There are three potential ways to use this library which affects how any custom middleware following a library-provided middleware function is invoked (Also see [Error Handling](#error-handling) for more details)
+
+```js
+app.post('/login', localAuth.login(), function(req, res) {
+    // If, and how, this function gets invoked depends
+    // on how you configure the options. See below
+});
+```
+### 1. In a web app using sessions
+The default mode. Custom middleware will only get called if there are no errors. Otherwise the library-provided middleware will set errors in flash (available via `req.flash('errors')` and `req.flash('validationErrors')`) and do a redirect.
+
+### 2. In a web app not using sessions
+If you set `options.useSessions = false`, library-provided middleware will set an appropriate `res.status_code` and will assign errors to either `res.locals.errors` or `res.locals.validationErrors` and will *always* invoke following middleware - so it's up to you to check `res.locals` for errors and render an appropriate response.
+
+### 3. In an API
+If you set `options.useSessions = false` and `options.autoSendErrors = true`, library-provided middleware will set an appropriate `res.status_code` and call `res.send(errors)` any time there's an error, but will *not* call `next()`. So following middleware will only get called if there were no errors.
+
+In this mode you normally don't need custom middleware invoked on an error because you don't have views to render.
 
 # Routes
 
@@ -374,8 +391,9 @@ app.use(function(req, res, next) {
 });
 ```
 
+### Not Using Sessions, Not Auto-Sending Errors
+Options: `{ useSessions: false }`
 
-### Not Using Sessions
 If an error occurs during a route the following happens:
 * `res.status(statusCode)` is called with an appropriate, non-200 status code
 * `res.locals.errors` will be populated with any non-validation error strings. Same format as `req.flash('errors')` above.
@@ -392,11 +410,44 @@ app.post('/login', localAuth.login(), function(req, res) {
   res.redirect('/home');
 });
 ```
-Hope to get a full sample together soon showing session-less usage. At the moment, it's theoretical :)
 
-### Per-route configuration
+### Not Using Sessions, Auto-Sending Errors
+Options: `{ useSessions: false, autoSendErrors: true }`
 
-Route handlers provided by this middleware will have an `options` object which has a `errorRedirect` property which you can set to `false` to force non-session based operation for that route. For example:
+If an error occurs during a route the following happens:
+* `res.status(statusCode)` is called with an appropriate, non-200 status code
+* `res.send(<error>)` is called, where `<error>` is either a validation or non-validation error as described above
+* Note: `next()` is **not** called, so any following middleware is not invoked
+
+```js
+app.post('/login', localAuth.login(), function(req, res) {
+
+  // This will only get invoked if no errors
+
+  res.send(200, { success: much });
+});
+```
+
+Hope to get a full sample together soon showing session-less usage. At the moment, it's a bit theoretical :)
+
+### Unexpected errors
+
+If a node callback returns an error, this is immediately used to call `next(err)` so you will also need an overall error handler for your application as usual. For example:
+
+```js
+app.use(function(err, req, res, next) {
+    logger.error(err);
+    res.status(500).render('error');
+});
+```
+
+# Per-route Configuration
+
+Route handlers provided by this middleware will generally take an `options` object which can have the following properties:
+* `errorRedirect` - set to `false` to force non-session based operation for that route
+* `autoSendErrors` - override the `options.autoSendErrors` value for this route
+
+For example:
 
 ```js
 app.post('/login', localAuth.login({ errorRedirect: false }), function(req, res) {
@@ -406,17 +457,6 @@ app.post('/login', localAuth.login({ errorRedirect: false }), function(req, res)
   // ...
 
   res.redirect('/home');
-});
-```
-
-### Unexpected errors
-
-If a callback returns an error, this is immediately used to call `next(err)` so you will also need an overall error handler for your application as usual. For example:
-
-```js
-app.use(function(err, req, res, next) {
-    logger.error(err);
-    res.status(500).render('error');
 });
 ```
 

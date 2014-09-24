@@ -200,6 +200,47 @@ describe('Forms-based Username and Password auth', function() {
                     .end(done);
             });
         });
+
+        describe('Without session (API mode)', function() {
+
+            var customHandlerCalled;
+
+            beforeEach(function(done) {
+                customHandlerCalled = false;
+
+                app = configureExpress();
+                configureLocalAuth(app, {
+                    useSessions: false,
+                    autoSendErrors: true
+                });
+
+                app.post('/login', localAuth.login(), function(req, res) {
+                    customHandlerCalled = true;
+                    res.send(200, 'should not get here');
+                });
+
+                setupExistingUser(authService, userStore, existingUserEmail, existingUsername, existingUserPassword, done);
+            });
+
+            it('validates without needing session', function(done) {
+                request(app)
+                    .post('/login')
+                    .send({ email: '', password: existingUserPassword })
+                    .expect(400)
+                    .expect(function(res) {
+                        assert.isFalse(customHandlerCalled);
+
+                        assert.deepEqual(res.body, {
+                            "email": {
+                                "msg": "Valid email address required",
+                                "param": "email",
+                                "value": ""
+                            }
+                        });
+                    })
+                    .end(done);
+            });
+        });
     });
 
     describe('Standard routes behaviour', function() {

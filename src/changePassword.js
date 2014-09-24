@@ -8,7 +8,7 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         changePassword: function(routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
+            var errorCfg = utils.getErrorConfig(options, routeOptions);
 
             return function changePasswordHandler(req, res, next) {
 
@@ -27,13 +27,13 @@ module.exports = function(sharedServices, authService, options) {
                     req.checkBody('oldPassword', 'Old password required').notEmpty();
                     req.checkBody('newPassword', 'New password required').notEmpty();
                     req.checkBody('confirmNewPassword', 'New password confirmation required').notEmpty();
-                    if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                    if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                         return;
                     }
 
                     // Only check confirm password after we know others are ok to avoid returning a redundant error
                     req.checkBody('confirmNewPassword', 'New password and confirm password do not match').matches('newPassword', req);
-                    if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                    if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                         return;
                     }
 
@@ -45,7 +45,7 @@ module.exports = function(sharedServices, authService, options) {
 
                         if (!passwordMatches) {
                             logger.info('Incorrect old password for user "%s" in change password handler', email, err);
-                            return utils.handleError('Incorrect password', errorRedirect, 401)(req, res, next);
+                            return utils.handleError('Incorrect password', errorCfg, 401)(req, res, next);
                         }
 
                         authService.hash(req.body.newPassword, function(err, hashedPassword) {

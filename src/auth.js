@@ -208,12 +208,12 @@ module.exports = function(sharedServices, options) {
                 }
             },
             login: function (routeOptions) {
-                var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
+                var errorCfg = utils.getErrorConfig(options, routeOptions);
 
                 return function loginHandler(req, res, next) {
                     req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                     req.checkBody('password', 'Password required').notEmpty();
-                    if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                    if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                         return;
                     }
 
@@ -226,9 +226,9 @@ module.exports = function(sharedServices, options) {
                             logger.info('User "%s" failed authentication during login', req.body.email, info);
 
                             if (info && info.accountLocked) {
-                                utils.handleError('Your account has been locked temporarily. Please try again later', errorRedirect, 401)(req, res, next);
+                                utils.handleError('Your account has been locked temporarily. Please try again later', errorCfg, 401)(req, res, next);
                             } else {
-                                utils.handleError('Invalid credentials', errorRedirect, 401)(req, res, next);
+                                utils.handleError('Invalid credentials', errorCfg, 401)(req, res, next);
                             }
                         } else {
                             authService.markLoggedInAfterAuthentication(req, user, function (err) {

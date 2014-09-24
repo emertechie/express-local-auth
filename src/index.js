@@ -41,6 +41,7 @@ module.exports = function(router, sharedServices, options) {
     options = _.defaults(options || {}, {
         loginPath: '/login',
         useSessions: true,
+        autoSendErrors: false,
         normalizeCase: true,
         failedLoginsBeforeLockout: 10,
         accountLockedMs: 20 * minuteInMs,

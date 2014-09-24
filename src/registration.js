@@ -11,12 +11,12 @@ module.exports = function(sharedServices, authService, options) {
 
     var routeHandlers = {
         register: function (routeOptions) {
-            var errorRedirect = utils.getErrorRedirectOption(routeOptions || {}, options.useSessions);
+            var errorCfg = utils.getErrorConfig(options, routeOptions);
 
             return function registerHandler(req, res, next) {
                 req.checkBody('email', 'Valid email address required').notEmpty().isEmail();
                 req.checkBody('password', 'Password required').notEmpty();
-                if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+                if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }
 
@@ -46,7 +46,7 @@ module.exports = function(sharedServices, authService, options) {
                         }
                         if (userAlreadyExists) {
                             logger.info('Registration details for user "%s" already exist', email);
-                            return utils.handleError('Registration details already in use', errorRedirect, 409)(req, res, next);
+                            return utils.handleError('Registration details already in use', errorCfg, 409)(req, res, next);
                         }
 
                         var sendRegEmailAndLogIn = function (verifyQueryString) {
@@ -105,8 +105,9 @@ module.exports = function(sharedServices, authService, options) {
             return function verifyEmailAddressHandler(req, res, next) {
                 req.checkQuery('email', 'Valid email address required').notEmpty().isEmail();
                 req.checkQuery('token', 'Verify email token required').notEmpty();
-                var errorRedirect = false;
-                if (utils.handleValidationErrors(errorRedirect)(req, res, next)) {
+
+                var errorCfg = utils.getErrorConfig(options, { errorRedirect: false });
+                if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }
 

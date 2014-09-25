@@ -431,7 +431,7 @@ describe('Forms-based Username and Password auth', function() {
                                 return done(err);
                             }
 
-                            assert.isUndefined(userStore.users[0].lockedUntil);
+                            assert.isNull(userStore.users[0].lockedUntil);
                             assert.equal(userStore.users[0].failedLoginAttempts, 0);
 
                             done();

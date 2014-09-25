@@ -163,7 +163,7 @@ module.exports = function(sharedServices, options) {
                             return done(null, false, { accountLocked: true });
                         } else {
                             logger.info('Lockout period expired for user "%s". Unlocking', email);
-                            delete user.lockedUntil;
+                            user.lockedUntil = null;
                             user.failedLoginAttempts = 0;
 
                             userStore.update(user, function (err) {

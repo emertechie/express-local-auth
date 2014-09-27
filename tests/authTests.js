@@ -45,7 +45,7 @@ describe('Forms-based Username and Password auth', function() {
                 app.use(cookieParser());
                 // Note: In a real app running with HTTPS, you should use following to limit cookie access:
                 // session({..., cookie: { httpOnly: true, secure: true } })
-                app.use(session({ secret: 'keyboard cat' } ));
+                app.use(session({ secret: 'keyboard cat', resave: false, saveUninitialized: true } ));
                 app.use(flash());
             }
 

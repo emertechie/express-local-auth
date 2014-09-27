@@ -441,8 +441,6 @@ app.post('/login', localAuth.login(), function(req, res) {
 });
 ```
 
-Hope to get a full sample together soon showing session-less usage. At the moment, it's a bit theoretical :)
-
 ### Unexpected errors
 
 If a node callback returns an error, this is immediately used to call `next(err)` so you will also need an overall error handler for your application as usual. For example:
@@ -457,7 +455,8 @@ app.use(function(err, req, res, next) {
 # Per-route Configuration
 
 Route handlers provided by this middleware will generally take an `options` object which can have the following properties:
-* `errorRedirect` - set to `false` to force non-session based operation for that route
+* `shouldRedirect` - override whether this route will do a redirect on error or not
+* `errorRedirect` - override where this route will redirect to on an error
 * `autoSendErrors` - override the `options.autoSendErrors` value for this route
 
 For example:

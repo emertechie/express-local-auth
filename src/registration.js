@@ -169,7 +169,7 @@ module.exports = function(sharedServices, authService, options) {
                     }
 
                     if (!authenticatedUser) {
-                        return res.redirect(authService.loginPath);
+                        return utils.handleError('Unauthenticated', { errorRedirect: authService.loginPath }, 401)(req, res, next);
                     }
 
                     var email = authenticatedUser.email;

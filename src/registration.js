@@ -106,7 +106,7 @@ module.exports = function(sharedServices, authService, options) {
                 req.checkQuery('email', 'Valid email address required').notEmpty().isEmail();
                 req.checkQuery('token', 'Verify email token required').notEmpty();
 
-                var errorCfg = utils.getErrorConfig(options, { errorRedirect: false });
+                var errorCfg = utils.getErrorConfig(options, { shouldRedirect: false });
                 if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }
@@ -169,7 +169,8 @@ module.exports = function(sharedServices, authService, options) {
                     }
 
                     if (!authenticatedUser) {
-                        return utils.handleError('Unauthenticated', { errorRedirect: authService.loginPath }, 401)(req, res, next);
+                        var errorConfig = utils.getErrorConfig(options, { errorRedirect: authService.loginPath });
+                        return utils.handleError('Unauthenticated', errorConfig, 401)(req, res, next);
                     }
 
                     var email = authenticatedUser.email;

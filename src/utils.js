@@ -1,11 +1,9 @@
 module.exports = {
     getErrorConfig: function(options, routeOptions) {
         routeOptions = routeOptions || {};
-
         return {
-            errorRedirect: routeOptions.errorRedirect === false
-                ? false
-                : routeOptions.errorRedirect || options.useSessions,
+            shouldRedirect: routeOptions.shouldRedirect === false ? false : routeOptions.shouldRedirect || options.useSessions,
+            customRedirect: routeOptions.errorRedirect,
             autoSendErrors: routeOptions.autoSendErrors || options.autoSendErrors || false
         };
     },
@@ -31,9 +29,9 @@ module.exports = {
         nonRedirectStatusCode = nonRedirectStatusCode || 400;
 
         return function(req, res, next) {
-            if (errorCfg.errorRedirect) {
+            if (errorCfg.shouldRedirect) {
                 req.flash(errorName, error);
-                var redirectPath = this.getErrorRedirectPath(req, errorCfg.errorRedirect, redirectQueryParams);
+                var redirectPath = this.getErrorRedirectPath(req, errorCfg.customRedirect, redirectQueryParams);
                 res.redirect(redirectPath);
             } else {
                 res.status(nonRedirectStatusCode);
@@ -48,11 +46,9 @@ module.exports = {
             }
         }.bind(this);
     },
-    getErrorRedirectPath: function(req, errorRedirect, redirectQueryParams) {
-        var path = (errorRedirect === true)
-            ? req.path // so, things like POST /register will redirect to GET /register with errors in flash
-            : errorRedirect;
-
+    getErrorRedirectPath: function(req, customRedirect, redirectQueryParams) {
+        // If no customRedirect, then things like POST /register will redirect to GET /register with errors in flash
+        var path = customRedirect || req.path;
         return path + (redirectQueryParams || '');
     }
 };

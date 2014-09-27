@@ -202,7 +202,8 @@ module.exports = function(sharedServices, options) {
                         if (authenticatedUser) {
                             next();
                         } else {
-                            return utils.handleError('Unauthenticated', { errorRedirect: options.loginPath }, 401)(req, res, next);
+                            var errorConfig = utils.getErrorConfig(options, { errorRedirect: options.loginPath });
+                            return utils.handleError('Unauthenticated', errorConfig, 401)(req, res, next);
                         }
                     });
                 }
@@ -249,7 +250,8 @@ module.exports = function(sharedServices, options) {
                                 next(err);
                             });
                         } else {
-                            return utils.handleError('Unauthenticated', { errorRedirect: options.loginPath }, 401)(req, res, next);
+                            var errorConfig = utils.getErrorConfig(options, { errorRedirect: options.loginPath });
+                            return utils.handleError('Unauthenticated', errorConfig, 401)(req, res, next);
                         }
                     });
                 }

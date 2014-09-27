@@ -19,7 +19,8 @@ module.exports = function(sharedServices, authService, options) {
                     }
 
                     if (!authenticatedUser) {
-                        return utils.handleError('Unauthenticated', { errorRedirect: authService.loginPath }, 401)(req, res, next);
+                        var errorConfig = utils.getErrorConfig(options, { errorRedirect: authService.loginPath });
+                        return utils.handleError('Unauthenticated', errorConfig, 401)(req, res, next);
                     }
 
                     var email = authenticatedUser.email;

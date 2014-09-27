@@ -591,7 +591,11 @@ describe('Forms-based Username and Password auth', function() {
                     // res.render('login')
                 });
                 app.get('/logout', localAuth.logout(), function(req, res) {
-                    res.redirect(logoutSuccessRedirectPath);
+                    if (res.statusCode === 401) {
+                        res.redirect('/login');
+                    } else {
+                        res.redirect(logoutSuccessRedirectPath);
+                    }
                 });
 
                 // Set up couple of custom routes
@@ -618,6 +622,63 @@ describe('Forms-based Username and Password auth', function() {
                         assert.deepEqual(loginErrors, [ 'Invalid credentials' ]);
                         done();
                     });
+            });
+
+            it('should ensure only logged in users can log out', function(done) {
+                request(app)
+                    .get('/logout')
+                    .expect(302)
+                    .expect('location', '/login', 'redirected to login page')
+                    .end(done);
+            });
+        });
+
+        describe('Without session (API mode)', function() {
+
+            beforeEach(function(done) {
+                app = configureExpress();
+                configureLocalAuth(app, {
+                    useSessions: false,
+                    autoSendErrors: true
+                });
+
+                app.post('/login', localAuth.login(), function(req, res) {
+                    res.send(200);
+                });
+                app.get('/logout', localAuth.logout(), function(req, res) {
+                    res.send(200);
+                });
+
+                // Set up couple of custom routes
+                app.get('/private', localAuth.ensureAuthenticated(), function(req, res) {
+                    res.send(200, 'private stuff');
+                });
+                app.get('/public', function(req, res) {
+                    res.send(200, 'public stuff');
+                });
+
+                setupExistingUser(authService, userStore, existingUserEmail, existingUsername, existingUserPassword, done);
+            });
+
+            it('should not log in user with invalid credentials', function(done) {
+                request(app)
+                    .post('/login')
+                    .send({ email: 'unknown@example.com', password: existingUserPassword })
+                    .expect(401)
+                    .expect(function(res) {
+                        assert.equal(res.text, 'Invalid credentials');
+                    })
+                    .end(done);
+            });
+
+            it('should ensure only logged in users can log out', function(done) {
+                request(app)
+                    .get('/logout')
+                    .expect(401)
+                    .expect(function(res) {
+                        assert.equal(res.text, 'Unauthenticated');
+                    })
+                    .end(done);
             });
         });
     });

@@ -103,7 +103,7 @@ module.exports = function(sharedServices, authService, options) {
 
                 req.checkQuery('token', 'Password reset token required').notEmpty();
                 req.checkQuery('email', 'Email address required').notEmpty();
-                var errorCfg = utils.getErrorConfig(options, { errorRedirect: false });
+                var errorCfg = utils.getErrorConfig(options, { shouldRedirect: false });
                 if (utils.handleValidationErrors(errorCfg)(req, res, next)) {
                     return;
                 }

@@ -151,13 +151,26 @@ app.post('/login', localAuth.login(), function(req, res) {
 });
 ```
 ### 1. In a web app using sessions
-The default mode. Custom middleware will only get called if there are no errors. Otherwise the library-provided middleware will set errors in flash (available via `req.flash('errors')` and `req.flash('validationErrors')`) and do a redirect.
+The default mode. If there's an error then library-provided middleware will:
+* Set errors in flash (available via `req.flash('errors')` and `req.flash('validationErrors')`)
+* Will do a redirect back to original path (See [Error Handling](#error-handling))
+
+So following middleware will only get called if there were no errors.
 
 ### 2. In a web app not using sessions
-If you set `options.useSessions = false`, library-provided middleware will set an appropriate `res.status_code` and will assign errors to either `res.locals.errors` or `res.locals.validationErrors` and will *always* invoke following middleware - so it's up to you to check `res.locals` for errors and render an appropriate response.
+If you set `options.useSessions = false`, if there's an error then library-provided middleware will:
+* Set an appropriate `res.status_code`
+* Assign errors to either `res.locals.errors` or `res.locals.validationErrors`
+* Will *always* call `next()` to invoke following middleware
+
+So following middleware will always get called and it's up to you to check `res.locals` for errors and render an appropriate response.
 
 ### 3. In an API
-If you set `options.useSessions = false` and `options.autoSendErrors = true`, library-provided middleware will set an appropriate `res.status_code` and call `res.send(errors)` any time there's an error, but will *not* call `next()`. So following middleware will only get called if there were no errors.
+If you set `options.useSessions = false` and `options.autoSendErrors = true`, if there's an error then library-provided middleware will:
+* Set an appropriate `res.status_code`
+* Will automatically call `res.send(errors)`  to return the error response - i.e. it will *not* call `next()`
+
+So following middleware will only get called if there were no errors.
 
 In this mode you normally don't need custom middleware invoked on an error because you don't have views to render.
 

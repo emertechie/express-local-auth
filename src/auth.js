@@ -249,7 +249,7 @@ module.exports = function(sharedServices, options) {
                                 next(err);
                             });
                         } else {
-                            res.redirect(options.loginPath);
+                            return utils.handleError('Unauthenticated', { errorRedirect: options.loginPath }, 401)(req, res, next);
                         }
                     });
                 }

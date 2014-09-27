@@ -1,6 +1,6 @@
 {
   "name": "express-local-auth",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Express middleware to implement username/email/password authentication including registration and password management",
   "main": "src/index.js",
   "keywords": [

@@ -250,8 +250,8 @@ module.exports = function(sharedServices, options) {
                                 next(err);
                             });
                         } else {
-                            var errorConfig = utils.getErrorConfig(options, { errorRedirect: options.loginPath });
-                            return utils.handleError('Unauthenticated', errorConfig, 401)(req, res, next);
+                            // Nothing to do - user isn't logged in
+                            next();
                         }
                     });
                 }

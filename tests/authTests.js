@@ -469,11 +469,11 @@ describe('Forms-based Username and Password auth', function() {
                 });
             });
 
-            it('should ensure only logged in users can log out', function(done) {
+            it('should return normal logged out page even if used wasn`t logged in when logout called', function(done) {
                 request(app)
                     .get('/logout')
                     .expect(302)
-                    .expect('location', '/login', 'redirected to login page')
+                    .expect('location', '/loggedOut')
                     .end(done);
             });
 
@@ -624,11 +624,11 @@ describe('Forms-based Username and Password auth', function() {
                     });
             });
 
-            it('should ensure only logged in users can log out', function(done) {
+            it('should return normal logged out page even if used wasn`t logged in when logout called', function(done) {
                 request(app)
                     .get('/logout')
                     .expect(302)
-                    .expect('location', '/login', 'redirected to login page')
+                    .expect('location', logoutSuccessRedirectPath)
                     .end(done);
             });
         });
@@ -643,10 +643,10 @@ describe('Forms-based Username and Password auth', function() {
                 });
 
                 app.post('/login', localAuth.login(), function(req, res) {
-                    res.send(200);
+                    res.send('logged in');
                 });
                 app.get('/logout', localAuth.logout(), function(req, res) {
-                    res.send(200);
+                    res.send('logged out');
                 });
 
                 // Set up couple of custom routes
@@ -671,12 +671,12 @@ describe('Forms-based Username and Password auth', function() {
                     .end(done);
             });
 
-            it('should ensure only logged in users can log out', function(done) {
+            it('should return normal logged out page even if used wasn`t logged in when logout called', function(done) {
                 request(app)
                     .get('/logout')
-                    .expect(401)
+                    .expect(200)
                     .expect(function(res) {
-                        assert.equal(res.text, 'Unauthenticated');
+                        assert.equal(res.text, 'logged out');
                     })
                     .end(done);
             });

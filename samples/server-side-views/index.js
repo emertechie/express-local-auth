@@ -23,10 +23,16 @@ var app = express(),
 app.use(express.static(__dirname + '/public'));
 app.set('views', __dirname + '/views');
 app.set('view engine', 'jade');
-app.use(bodyParser.urlencoded());
+app.use(bodyParser.urlencoded({
+    extended: false
+}));
 app.use(cookieParser());
 // TODO: Use proper security settings with HTTPS
-app.use(session({ secret: 'keyboard cat' }));
+app.use(session({
+    secret: 'keyboard cat',
+    resave: false,
+    saveUninitialized: false
+}));
 app.use(flash());
 
 var services = {

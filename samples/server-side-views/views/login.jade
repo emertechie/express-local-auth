@@ -4,8 +4,11 @@ block title
     title Log in
 
 block content
-    h1 Log in
+    h1 Register
+    div
+        a(href='/register') Register
 
+    h1 Log in
     form(action='/login', method='post')
         div
             label(for='email') Email
@@ -15,6 +18,5 @@ block content
             input#password(type='password', name='password', value='pass')
         button(type='submit') Log In
     div
+        br
         a(href='/forgotpassword') Forgot Password?
-    div
-        a(href='/register') Register

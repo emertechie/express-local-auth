@@ -497,7 +497,7 @@ describe('Forms-based Username and Password auth', function() {
                             var cookies = res.headers['set-cookie'];
                             request(app)
                                 .get('/private')
-                                .set('cookie', cookies)
+                                .set('cookie', cookies || '')
                                 .expect(302)
                                 .expect('location', '/login')
                                 .end(done);

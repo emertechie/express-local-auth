@@ -10,7 +10,7 @@ FakeUserStore.prototype.add = function(userDetails, callback) {
         return callback(null, userAlreadyExists);
     }
 
-    var user = clone(userDetails);
+    var user = _.clone(userDetails);
     user.id = this.fakeUserId || ('User#' + (this.users.length + 1));
     this.users.push(user);
     callback(null, userAlreadyExists, user);
@@ -32,7 +32,7 @@ FakeUserStore.prototype.update = function(user, callback) {
         return callback(null, null);
     }
 
-    var updated = clone(user);
+    var updated = _.clone(user);
     this.users[userIdx] = updated;
     return callback(null, updated);
 };
@@ -53,10 +53,6 @@ function _findByEmailSync(email) {
     return _.find(this.users, function(user) {
         return user.email === email;
     });
-}
-
-function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
 }
 
 module.exports = FakeUserStore;

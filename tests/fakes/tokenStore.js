@@ -6,7 +6,7 @@ function FakeTokenStore() {
 }
 
 FakeTokenStore.prototype.add = function(tokenDetails, callback) {
-    var cloned = clone(tokenDetails);
+    var cloned = cloneToken(tokenDetails);
     cloned.tokenId = 'Token#' + (++this.lastId);
     this.tokens.push(cloned);
     callback(null);
@@ -26,8 +26,8 @@ FakeTokenStore.prototype.findByEmail = function(email, callback) {
     callback(null, found);
 };
 
-function clone(tokenDetails) {
-    var parsed = JSON.parse(JSON.stringify(tokenDetails));
+function cloneToken(tokenDetails) {
+    var parsed = _.clone(tokenDetails);
     parsed.expiry = new Date(parsed.expiry);
     return parsed;
 }

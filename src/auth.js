@@ -109,13 +109,13 @@ module.exports = function(sharedServices, options) {
                     }
 
                     var verifyPassword = function () {
-                        authService.verifyHash(password, user.hashedPassword, function (err, verifiied) {
+                        authService.verifyHash(password, user.hashedPassword, function (err, verified) {
                             if (err) {
                                 logger.error('Error verifying password hash for user "%s" in verify fn', user.email, err);
                                 return done(err);
                             }
 
-                            if (!verifiied) {
+                            if (!verified) {
                                 user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
 
                                 if (user.failedLoginAttempts >= options.failedLoginsBeforeLockout) {

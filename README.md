@@ -543,7 +543,7 @@ See the [fake Token Store](tests/fakes/tokenStore) used in tests to get a quick 
 The expected API for this service is:
 
 #### add(tokenDetails, callback)
-* `tokenDetails` - object containing `email`, `userId` properties and for password reset tokens an `expiry` also.
+* `tokenDetails` - object containing `email`, `userId`, `hashedToken` properties and for password reset tokens an `expiry` also.
 * `callback(err)` - standard node callback when operation complete
 
 ### removeAllByEmail(email, callback)

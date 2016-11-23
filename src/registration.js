@@ -1,5 +1,5 @@
 var _ = require('lodash'),
-    uuid = require('node-uuid'),
+    uuid = require('uuid'),
     utils = require('./utils');
 
 module.exports = function(sharedServices, authService, options) {

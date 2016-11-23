@@ -1,5 +1,5 @@
 var _ = require('lodash'),
-    uuid = require('node-uuid'),
+    uuid = require('uuid'),
     async = require('async'),
     utils = require('./utils');
 
